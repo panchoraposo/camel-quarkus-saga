@@ -13,6 +13,7 @@ USER root
 COPY --from=build /app /app
 COPY src/* /app/
 COPY public/* /app/
+RUN rm -rf /app/node_modules/.cache
 RUN chown -R 1001:1001 /app /app/node_modules
 EXPOSE 3000
 USER 1001
