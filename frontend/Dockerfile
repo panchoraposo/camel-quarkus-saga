@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi9/nodejs-18 AS build
+FROM registry.redhat.io/ubi9/nodejs-20 AS build
 WORKDIR /app
 COPY package.json package-lock.json* ./
 USER root
@@ -7,7 +7,7 @@ ENV NODE_OPTIONS="--openssl-legacy-provider"
 COPY . .
 RUN npm run build
 
-FROM registry.redhat.io/ubi9/nodejs-18 AS production
+FROM registry.redhat.io/ubi9/nodejs-20 AS production
 WORKDIR /app
 USER root
 COPY --from=build /app /app
