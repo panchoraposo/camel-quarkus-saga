@@ -46,7 +46,6 @@ const OrdersOverview = () => {
         </thead>
         <tbody>
           {orders.map((order) => {
-            const totalPayment = order.payment.paymentId ? `$${order.seat.price}` : "N/A";
 
             return (
               <tr key={order.orderId}>
