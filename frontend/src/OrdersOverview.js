@@ -9,7 +9,7 @@ const OrdersOverview = () => {
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const ordersRes = await fetch("http://order:80/orders");
+        const ordersRes = await fetch("https://order-camel-saga.apps.rosa-2rxpz.11pv.p1.openshiftapps.com/orders");
         const ordersData = await ordersRes.json();
         console.log("Órdenes obtenidas:", ordersData);
 
