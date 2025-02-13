@@ -12,14 +12,14 @@ function SeatSelection() {
   const [status, setStatus] = useState('');
 
   useEffect(() => {
-    axios.get('http://order:80/orders/users')
+    axios.get('https://order-camel-saga.apps.rosa-2rxpz.11pv.p1.openshiftapps.com/orders/users')
       .then(response => setUsers(response.data))
       .catch(error => {
         console.error('Error al obtener usuarios:', error);
         setStatus('Error al cargar la lista de usuarios.');
       });
 
-    axios.get('http://allocate:80/seats')
+    axios.get('https://allocate-camel-saga.apps.rosa-2rxpz.11pv.p1.openshiftapps.com/seats')
       .then(response => {
         const sortedSeats = response.data.sort((a, b) => a.seatId.localeCompare(b.seatId));
         setSeats(sortedSeats);
@@ -49,7 +49,7 @@ function SeatSelection() {
     const price = selectedSeatData ? selectedSeatData.price : 0;
 
     try {
-      const response = await axios.post('http://order:80/orders', {
+      const response = await axios.post('https://order-camel-saga.apps.rosa-2rxpz.11pv.p1.openshiftapps.com/orders', {
         seatId: selectedSeat,
         userId: selectedUser,
         price: price
@@ -57,7 +57,7 @@ function SeatSelection() {
       setStatus(`Ordern creada para el asiento ${selectedSeat} de ${selectedUser}`);
       console.log(response.data);
 
-      const updatedSeats = await axios.get('http://allocate:80/seats');
+      const updatedSeats = await axios.get('https://allocate-camel-saga.apps.rosa-2rxpz.11pv.p1.openshiftapps.com/seats');
       setSeats(updatedSeats.data.sort((a, b) => a.seatId.localeCompare(b.seatId)));
     } catch (error) {
       setStatus(`Erroral crear orden para el asiento ${selectedSeat}`);
