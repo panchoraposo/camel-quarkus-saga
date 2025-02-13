@@ -3,7 +3,6 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 USER root
 RUN npm install
-ENV NODE_OPTIONS="--openssl-legacy-provider"
 COPY . .
 RUN npm run build
 
