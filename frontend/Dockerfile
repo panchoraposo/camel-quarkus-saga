@@ -10,8 +10,7 @@ FROM registry.redhat.io/ubi9/nodejs-20 AS production
 WORKDIR /app
 USER root
 COPY --from=build /app /app
-COPY src/server.js /app/
-RUN npm install express
+#COPY src/* /app/
 EXPOSE 3000
 USER 1001
 CMD ["npm", "start"]
