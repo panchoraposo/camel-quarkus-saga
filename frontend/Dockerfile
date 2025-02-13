@@ -10,7 +10,8 @@ FROM registry.redhat.io/ubi9/nodejs-20 AS production
 WORKDIR /app
 USER root
 COPY --from=build /app /app
-RUN chown -R 1001:1001 /app && chmod -R 775 /app
+RUN chown -R 1001:1001 /app && chmod -R 775 /app && \
+    chown -R 1001:1001 /app/node_modules/.cache/.eslintcache && chmod -R 775 /app/node_modules/.cache/.eslintcache
 #COPY src/* /app/
 EXPOSE 3000
 USER 1001
