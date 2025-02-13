@@ -9,7 +9,7 @@ const OrdersOverview = () => {
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const ordersRes = await fetch("http://localhost:8083/orders");
+        const ordersRes = await fetch("http://order:80/orders");
         const ordersData = await ordersRes.json();
         console.log("Órdenes obtenidas:", ordersData);
 
