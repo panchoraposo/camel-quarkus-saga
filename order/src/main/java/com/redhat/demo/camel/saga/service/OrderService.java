@@ -66,20 +66,18 @@ public class OrderService {
         }
         return order;
     }
-
-    public void cancelOrder(Exchange exchange) {
-
-        String orderId = exchange.getMessage().getHeader("id", String.class);
-        LOG.info("Cancelling order " + orderId);
-        OrderDto order = exchange.getMessage().getBody(OrderDto.class);
-
+    
+    public void cancelOrder(OrderDto order) {
         if (order == null) {
-            throw new IllegalArgumentException("OrderDto is null. Check your JSON payload.");
+            LOG.error("Intento de cancelar una orden nula.");
+            return;
         }
 
-        order.setOrderMessage("Order ${header.id} cancelled.");
-        order.setOrderStatus("CANCELLED");
+        String orderId = order.getOrderId();
+        LOG.info("COMPENSATION -> Cancelling order " + orderId);
 
+        order.setOrderMessage("Order " + orderId + " cancelled due to an issue.");
+        order.setOrderStatus("CANCELLED");
     }
 
     @Transactional
