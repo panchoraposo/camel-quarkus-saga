@@ -10,16 +10,18 @@ function SeatSelection() {
   const [users, setUsers] = useState([]);
   const [seats, setSeats] = useState([]);
   const [status, setStatus] = useState('');
+  const orderBaseUrl = process.env.REACT_APP_ORDER_API_URL || 'http://localhost:8083';
+  const allocationBaseUrl = process.env.REACT_APP_ALLOCATION_API_URL || 'http://localhost:8081';
 
   useEffect(() => {
-    axios.get('https://order-camel-saga.apps.rosa-2rxpz.11pv.p1.openshiftapps.com/orders/users')
+    axios.get(`${orderBaseUrl}/users`)
       .then(response => setUsers(response.data))
       .catch(error => {
         console.error('Error al obtener usuarios:', error);
         setStatus('Error al cargar la lista de usuarios.');
       });
 
-    axios.get('https://allocate-camel-saga.apps.rosa-2rxpz.11pv.p1.openshiftapps.com/seats')
+    axios.get(`${allocationBaseUrl}/seats`)
       .then(response => {
         const sortedSeats = response.data.sort((a, b) => a.seatId.localeCompare(b.seatId));
         setSeats(sortedSeats);
@@ -49,18 +51,18 @@ function SeatSelection() {
     const price = selectedSeatData ? selectedSeatData.price : 0;
 
     try {
-      const response = await axios.post('https://order-camel-saga.apps.rosa-2rxpz.11pv.p1.openshiftapps.com/orders', {
+      const response = await axios.post(`${orderBaseUrl}/order`, {
         seatId: selectedSeat,
         userId: selectedUser,
         price: price
       });
-      setStatus(`Ordern creada para el asiento ${selectedSeat} de ${selectedUser}`);
+      setStatus(`Orden creada para el asiento ${selectedSeat} de ${selectedUser}`);
       console.log(response.data);
 
-      const updatedSeats = await axios.get('https://allocate-camel-saga.apps.rosa-2rxpz.11pv.p1.openshiftapps.com/seats');
+      const updatedSeats = await axios.get(`${allocationBaseUrl}/seats`);
       setSeats(updatedSeats.data.sort((a, b) => a.seatId.localeCompare(b.seatId)));
     } catch (error) {
-      setStatus(`Erroral crear orden para el asiento ${selectedSeat}`);
+      setStatus(`Error al crear orden para el asiento ${selectedSeat}`);
       console.error(error);
     }
   };
