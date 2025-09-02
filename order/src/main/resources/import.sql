@@ -1,4 +1,4 @@
-INSERT INTO "user" (username, email, budget) VALUES 
+INSERT INTO user_table (username, email, budget) VALUES 
 ('johndoe', 'johndoe@example.com', 100.50),
 ('janedoe', 'janedoe@example.com', 200.75),
 ('alice', 'alice@example.com', 150.00),
