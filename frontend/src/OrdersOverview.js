@@ -5,11 +5,12 @@ import "moment/locale/es";
 
 const OrdersOverview = () => {
   const [orders, setOrders] = useState([]);
+  const orderBaseUrl = process.env.REACT_APP_ORDER_API_URL || 'http://localhost:8083';
 
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const ordersRes = await fetch("https://order-camel-saga.apps.rosa-2rxpz.11pv.p1.openshiftapps.com/orders");
+        const ordersRes = await fetch(`${orderBaseUrl}/orders`);
         const ordersData = await ordersRes.json();
         console.log("Órdenes obtenidas:", ordersData);
 
@@ -26,7 +27,7 @@ const OrdersOverview = () => {
     };
 
     fetchOrders();
-  }, []);
+  }, [orderBaseUrl]);
 
   return (
     <div className="container">

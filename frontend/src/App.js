@@ -14,6 +14,7 @@ function SeatSelection() {
   const allocationBaseUrl = process.env.REACT_APP_ALLOCATION_API_URL || 'http://localhost:8081';
 
   useEffect(() => {
+    // Se usan template literals para consistencia
     axios.get(`${orderBaseUrl}/users`)
       .then(response => setUsers(response.data))
       .catch(error => {
@@ -30,10 +31,10 @@ function SeatSelection() {
         console.error('Error al obtener asientos:', error);
         setStatus('Error al cargar la lista de asientos.');
       });
-  }, []);
+  }, [orderBaseUrl, allocationBaseUrl]);
 
   const handleSeatClick = (seatId) => {
-    const seat = seats.find(seat => seat.seatId === seatId);
+    const seat = seats.find(s => s.seatId === seatId);
     if (seat && seat.status === 'not available') {
       setStatus(`El asiento ${seatId} ya está reservado.`);
       return;
