@@ -8,7 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "\"user\"")
+@Table(name = "user_table")
 public class User extends PanacheEntityBase {
 
     @Id
