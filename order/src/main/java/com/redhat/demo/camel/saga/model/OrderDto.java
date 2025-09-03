@@ -1,5 +1,8 @@
 package com.redhat.demo.camel.saga.model;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
+
+@RegisterForReflection
 public class OrderDto {
 
     private Long userId;
