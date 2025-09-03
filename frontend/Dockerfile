@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi10/nodejs-22-minimal AS build
+FROM registry.redhat.io/ubi10/nodejs-22-minimal:10.0 AS build
 WORKDIR /app
 COPY package.json package-lock.json* ./
 USER root
@@ -6,7 +6,7 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-FROM registry.redhat.io/ubi10/nodejs-22-minimal AS production
+FROM registry.redhat.io/ubi10/nodejs-22-minimal:10.0 AS production
 WORKDIR /app
 USER root
 COPY --from=build /app /app
