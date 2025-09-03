@@ -1,0 +1,197 @@
+# camel-k: language=yaml
+
+# Dependencias de Maven que Camel K necesita para ejecutar esta integración.
+# camel-k: dependency=camel-quarkus-rest
+# camel-k: dependency=camel-quarkus-jackson
+# camel-k: dependency=camel-quarkus-kafka
+# camel-k: dependency=camel-quarkus-sql
+# camel-k: dependency=camel-quarkus-saga
+# camel-k: dependency=mvn:io.quarkus:quarkus-jdbc-postgresql
+# camel-k: dependency=mvn:com.fasterxml.jackson.core:jackson-databind
+
+# Archivos Java adicionales que se compilarán junto con esta ruta.
+# Camel K los encontrará y los añadirá al classpath.
+# camel-k: source=com/redhat/demo/camel/saga/model/OrderDto.java
+# camel-k: source=com/redhat/demo/camel/saga/service/OrderService.java
+# camel-k: source=com/redhat/demo/camel/saga/repository/OrderRepository.java
+# camel-k: source=com/redhat/demo/camel/saga/repository/UserRepository.java
+# camel-k: source=com/redhat/demo/entity/Order.java
+# camel-k: source=com/redhat/demo/entity/User.java
+
+# Configuración de propiedades (similar a application.properties)
+# camel-k: property=sql.insertOrder=INSERT INTO order_table (userId, orderId, seatId, orderStatus, orderMessage) VALUES (:#userId, :#orderId, :#seatId, :#orderStatus, :#orderMessage)
+# camel-k: property=sql.updateOrder=UPDATE order_table SET paymentId = :#paymentId, orderStatus = :#orderStatus, orderMessage = :#orderMessage, paymentStatus = :#paymentStatus, paymentMessage = :#paymentMessage, date = :#date, seatStatus = :#seatStatus, seatMessage = :#seatMessage, price = :#price WHERE orderid = :#orderId
+- beans:
+  - name: "orderService"
+    type: "com.redhat.demo.camel.saga.service.OrderService"
+  - name: "orderRepository"
+    type: "com.redhat.demo.camel.saga.repository.OrderRepository"
+  - name: "userRepository"
+    type: "com.redhat.demo.camel.saga.repository.UserRepository"
+
+- from:
+    uri: "rest:post:/order"
+    steps:
+      - unmarshal:
+          json:
+            library: Jackson
+      - to:
+          uri: "bean:orderService?method=prepareNewOrder"
+      - log:
+          loggingLevel: "INFO"
+          message: "Order received: ${header.orderJson}"
+      - saga:
+          steps:
+            - to:
+                uri: "direct:newOrder"
+      - marshal:
+          json:
+            library: Jackson
+
+- from:
+    uri: "direct:newOrder"
+    steps:
+      - log:
+          message: "Processing order id: ${header.id}"
+      - saga:
+          propagation: "MANDATORY"
+      - to:
+          uri: "bean:orderService?method=createOrder"
+      - log:
+          message: "Persisting order in database: ${header.id}"
+      - to:
+          uri: "direct:insertOrder"
+      - to:
+          uri: "bean:orderService?method=convertOrderToJson"
+      - log:
+          message: "Sending order event to Kafka: ${body}"
+      - to:
+          uri: "kafka:order-events"
+      - log:
+          message: "Order sent to Kafka topic: order-events."
+
+- from:
+    uri: "direct:insertOrder"
+    steps:
+      - setHeader:
+          name: "orderId"
+          simple: "${body.orderId}"
+      - setHeader:
+          name: "seatId"
+          simple: "${body.seatId}"
+      - setHeader:
+          name: "orderStatus"
+          simple: "${body.orderStatus}"
+      - setHeader:
+          name: "userId"
+          simple: "${body.userId}"
+      - setHeader:
+          name: "orderMessage"
+          simple: "${body.orderMessage}"
+      - log:
+          message: "Headers: orderId=${header.orderId}, userId=${header.userId}, seatId=${header.seatId}, orderStatus=${header.orderStatus}, orderMessage=${header.orderMessage}"
+      - log:
+          message: "SQL: {{sql.insertOrder}}"
+      - to:
+          uri: "sql:{{sql.insertOrder}}"
+      - log:
+          message: "Order inserted successfully"
+
+- from:
+    uri: "direct:cancelOrder"
+    steps:
+      - log:
+          message: "COMPENSATION -> Cancelling order: ${header.id}"
+      - to:
+          uri: "bean:orderService?method=cancelOrder"
+      - setHeader:
+          name: "orderStatus"
+          constant: "CANCELLED"
+      - setHeader:
+          name: "orderMessage"
+          constant: "Order failed to create."
+
+- from:
+    uri: "kafka:compensation-events"
+    steps:
+      - unmarshal:
+          json: {}
+      - log:
+          message: "Compensation event from Kafka: ${body}"
+      - to:
+          uri: "direct:cancelOrder"
+
+- from:
+    uri: "kafka:payment-events"
+    steps:
+      - log:
+          message: "Raw Payment event from Kafka: ${body}"
+      - unmarshal:
+          json:
+            library: Jackson
+      - log:
+          message: "Parsed OrderDto: ${body}"
+      - setHeader:
+          name: "orderId"
+          simple: "${body.orderId}"
+      - choice:
+          when:
+            - simple: "${body.seatStatus} == 'FAILED' || ${body.paymentStatus} == 'CANCELLED'"
+              steps:
+                - setHeader:
+                    name: "orderStatus"
+                    constant: "FAILED"
+                - setHeader:
+                    name: "orderMessage"
+                    constant: "Order failed to complete."
+            - simple: "${body.seatStatus} == 'RESERVED' || ${body.paymentStatus} == 'COMPLETED'"
+              steps:
+                - setHeader:
+                    name: "orderStatus"
+                    constant: "COMPLETED"
+                - setHeader:
+                    name: "orderMessage"
+                    constant: "Order completed."
+      - setHeader:
+          name: "paymentId"
+          simple: "${body.paymentId}"
+      - setHeader:
+          name: "paymentStatus"
+          simple: "${body.paymentStatus}"
+      - setHeader:
+          name: "paymentMessage"
+          simple: "${body.paymentMessage}"
+      - setHeader:
+          name: "seatStatus"
+          simple: "${body.seatStatus}"
+      - setHeader:
+          name: "seatMessage"
+          simple: "${body.seatMessage}"
+      - setHeader:
+          name: "date"
+          simple: "${body.date}"
+      - setHeader:
+          name: "price"
+          simple: "${body.price}"
+      - to:
+          uri: "direct:updateOrder"
+
+- from:
+    uri: "direct:updateOrder"
+    steps:
+      - log:
+          message: "Headers antes de actualizar en SQL: orderId=${header.orderId}, paymentId=${header.paymentId}, paymentStatus=${header.paymentStatus}, paymentMessage=${header.paymentMessage}, seatStatus=${header.seatStatus}, seatMessage=${header.seatMessage}, orderStatus=${header.orderStatus}, orderMessage=${header.orderMessage}"
+      - to:
+          uri: "bean:orderService?method=updateOrder"
+      - log:
+          message: "SQL: {{sql.updateOrder}}"
+      - to:
+          uri: "sql:{{sql.updateOrder}}"
+      - log:
+          message: "Order: ${header.orderId} updated."
+      - choice:
+          when:
+            - simple: "${body.seatStatus} == 'RESERVED' || ${body.paymentStatus} == 'COMPLETED'"
+              steps:
+                - to:
+                    uri: "bean:orderService?method=updateUserBudget"
