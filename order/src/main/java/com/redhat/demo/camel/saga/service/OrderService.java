@@ -14,6 +14,7 @@ import com.redhat.demo.camel.saga.model.OrderDto;
 import com.redhat.demo.entity.User;
 
 import io.quarkus.logging.Log;
+import io.quarkus.runtime.annotations.RegisterForReflection;
 
 import com.redhat.demo.camel.saga.repository.UserRepository;
 
@@ -22,6 +23,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.transaction.Transactional;
 
+@RegisterForReflection
 @ApplicationScoped
 @Named("orderService")
 public class OrderService {
