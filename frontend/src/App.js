@@ -13,6 +13,8 @@ function SeatSelection() {
   const orderBaseUrl = process.env.REACT_APP_ORDER_API_URL || 'http://localhost:8083';
   const allocationBaseUrl = process.env.REACT_APP_ALLOCATION_API_URL || 'http://localhost:8081';
 
+  const UNAVAILABLE_STATUS = "RESERVED"; 
+
   useEffect(() => {
     // Se usan template literals para consistencia
     axios.get(`${orderBaseUrl}/users`)
@@ -35,7 +37,7 @@ function SeatSelection() {
 
   const handleSeatClick = (seatId) => {
     const seat = seats.find(s => s.seatId === seatId);
-    if (seat && seat.status === 'not available') {
+    if (seat && seat.status && seat.status.toUpperCase() === UNAVAILABLE_STATUS) {
       setStatus(`El asiento ${seatId} ya está reservado.`);
       return;
     }
@@ -91,7 +93,7 @@ function SeatSelection() {
             {row.map(seat => (
               <div
                 key={seat.seatId}
-                className={`seat ${selectedSeat === seat.seatId ? 'selected' : ''} ${seat.status === 'not available' ? 'not-available disabled' : ''}`}
+                className={`seat ${selectedSeat === seat.seatId ? 'selected' : ''} ${seat.status && seat.status.toUpperCase() === UNAVAILABLE_STATUS ? 'not-available' : ''}`}
                 onClick={() => handleSeatClick(seat.seatId)}
               >
                 <div className="seat-id">{seat.seatId}</div>
