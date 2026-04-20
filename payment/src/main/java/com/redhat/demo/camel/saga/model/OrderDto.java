@@ -2,6 +2,8 @@ package com.redhat.demo.camel.saga.model;
 
 public class OrderDto {
 
+    private String sagaId;
+    private String eventType;
     private Long userId;
     private String orderId;
     private String orderStatus;
@@ -14,6 +16,24 @@ public class OrderDto {
     private String seatId;
     private String seatStatus;
     private String seatMessage;
+    private Boolean budgetReserved;
+    private Boolean forceFailPayment;
+
+    public String getSagaId() {
+        return sagaId;
+    }
+
+    public void setSagaId(String sagaId) {
+        this.sagaId = sagaId;
+    }
+
+    public String getEventType() {
+        return eventType;
+    }
+
+    public void setEventType(String eventType) {
+        this.eventType = eventType;
+    }
 
     public Long getUserId() {
         return userId;
@@ -111,6 +131,20 @@ public class OrderDto {
         this.seatMessage = seatMessage;
     }
 
-    
+    public Boolean getBudgetReserved() {
+        return budgetReserved;
+    }
+
+    public void setBudgetReserved(Boolean budgetReserved) {
+        this.budgetReserved = budgetReserved;
+    }
+
+    public Boolean getForceFailPayment() {
+        return forceFailPayment;
+    }
+
+    public void setForceFailPayment(Boolean forceFailPayment) {
+        this.forceFailPayment = forceFailPayment;
+    }
 
 }

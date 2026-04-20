@@ -1,13 +1,11 @@
 package com.redhat.demo.camel.saga.route;
 
-import java.sql.SQLException;
 import java.util.UUID;
 
 import org.apache.camel.LoggingLevel;
 import org.apache.camel.builder.RouteBuilder;
-import org.apache.camel.model.SagaPropagation;
+import org.apache.camel.component.kafka.KafkaConstants;
 import org.apache.camel.model.dataformat.JsonLibrary;
-import org.apache.camel.saga.InMemorySagaService;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -30,14 +28,6 @@ public class OrderRoute extends RouteBuilder {
         @Override
         public void configure() throws Exception {
 
-                // Se agrega SAGA al contexto de Camel
-                getContext().addService(new InMemorySagaService());
-
-                onException(SQLException.class)
-                        .log("Exception occurred: ${exception.message}")
-                        .handled(true)
-                        .to("direct:cancelOrder");
-
                 // Endpoint REST para crear un pedido
                 from("rest:post:/order")
                         .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
@@ -45,6 +35,7 @@ public class OrderRoute extends RouteBuilder {
                                 exchange.getMessage().setHeader("id", UUID.randomUUID().toString());
                                 OrderDto order = exchange.getMessage().getBody(OrderDto.class);
                                 order.setOrderId(exchange.getMessage().getHeader("id", String.class));
+                                order.setSagaId(order.getOrderId());
                                 exchange.getMessage().setBody(order);
 
                                 ObjectMapper objectMapper = new ObjectMapper();
@@ -53,29 +44,35 @@ public class OrderRoute extends RouteBuilder {
                                 exchange.getMessage().setHeader("orderJson", jsonOrder);
                         })
                         .log(LoggingLevel.INFO, "Order received: ${header.orderJson}")
-                        // SAGA is started
-                        .saga()
                         .to("direct:newOrder")
                         .marshal().json(JsonLibrary.Jackson);
 
                 from("direct:newOrder")
                         .log("Processing order id: ${header.id}")
-                        .saga().propagation(SagaPropagation.MANDATORY)
-                        .option("id", header("id"))
                         .setBody(body())
+                        .bean(orderService, "enrichUserFromIdentity")
                         .bean(orderService, "createOrder")
+                        .bean(orderService, "reserveBudget")
                         .log("Persisting order in database: ${header.id}")
                         // Database
                         .to("direct:insertOrder")
-                        .process(exchange -> {
-                                OrderDto order = exchange.getIn().getBody(OrderDto.class);
-                                ObjectMapper objectMapper = new ObjectMapper();
-                                String json = objectMapper.writeValueAsString(order);
-                                exchange.getIn().setBody(json);
-                        })
-                        .log("Sending order event to Kafka: ${body}")
-                        .to("kafka:order-events")
-                        .log("Order sent to Kafka topic: order-events.");
+                        .choice()
+                                .when().simple("${body.orderStatus} == 'FAILED'")
+                                        .log("Order failed before starting distributed saga: ${body.orderMessage}")
+                                .otherwise()
+                                        .process(exchange -> {
+                                                OrderDto order = exchange.getIn().getBody(OrderDto.class);
+                                                order.setEventType("OrderCreated");
+                                                order.setSagaId(order.getOrderId());
+                                                ObjectMapper objectMapper = new ObjectMapper();
+                                                String json = objectMapper.writeValueAsString(order);
+                                                exchange.getIn().setBody(json);
+                                        })
+                                        .setHeader(KafkaConstants.KEY, simple("${header.id}"))
+                                        .log("Sending OrderCreated event to Kafka: ${body}")
+                                        .to("kafka:order-events")
+                                        .log("OrderCreated sent to Kafka topic: order-events.")
+                        .end();
                 
                 from("direct:insertOrder")
                         .setHeader("orderId", simple("${body.orderId}"))
@@ -88,29 +85,35 @@ public class OrderRoute extends RouteBuilder {
                         .to("sql:{{sql.insertOrder}}")
                         .log("Order inserted successfully");
 
-                // Compensation
-                from("direct:cancelOrder")
-                        .log("COMPENSATION -> Cancelling order: ${header.id}")
-                        .bean(orderService, "cancelOrder")
-                        .setHeader("orderStatus", constant("CANCELLED"))
-                        .setHeader("orderMessage", constant("Order failed to create."));
-
-                from("kafka:compensation-events")
-                        .unmarshal().json(OrderDto.class)
-                        .log("Compensation event from Kafka: ${body}")
-                        .to("direct:cancelOrder");
+                // Allocation result (seat-events)
+                from("kafka:seat-events")
+                        .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
+                        .filter().simple("${body.eventType} == 'SeatReserveFailed'")
+                        .log("Seat reservation failed: ${body.seatMessage}")
+                        .setHeader("orderId", simple("${body.orderId}"))
+                        .setHeader("orderStatus", constant("FAILED"))
+                        .setHeader("orderMessage", constant("Order failed due to seat allocation."))
+                        .setHeader("seatStatus", simple("${body.seatStatus}"))
+                        .setHeader("seatMessage", simple("${body.seatMessage}"))
+                        .setHeader("paymentId", simple("${body.paymentId}"))
+                        .setHeader("paymentStatus", simple("${body.paymentStatus}"))
+                        .setHeader("paymentMessage", simple("${body.paymentMessage}"))
+                        .setHeader("date", simple("${body.date}"))
+                        .setHeader("price", simple("${body.price}"))
+                        .bean(orderService, "refundBudget")
+                        .to("direct:updateOrder");
 
                 from("kafka:payment-events")
                         .log("Raw Payment event from Kafka: ${body}")
                         .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
                         .log("Parsed OrderDto: ${body}")
-                        .log("Order Status: ${body.orderStatus}, Order Message: ${body.orderMessage}")
+                        .log("Payment eventType=${body.eventType} paymentStatus=${body.paymentStatus}")
                         .setHeader("orderId", simple("${body.orderId}"))
                         .choice()
-                                .when().simple("${body.seatStatus} == 'FAILED' || ${body.paymentStatus} == 'CANCELLED'")
+                                .when().simple("${body.eventType} == 'PaymentFailed'")
                                         .setHeader("orderStatus", constant("FAILED"))
-                                        .setHeader("orderMessage", constant("Order failed to complete."))
-                                .when().simple("${body.seatStatus} == 'RESERVED' || ${body.paymentStatus} == 'COMPLETED'")
+                                        .setHeader("orderMessage", constant("Order failed due to payment failure."))
+                                .when().simple("${body.eventType} == 'PaymentCompleted'")
                                         .setHeader("orderStatus", constant("COMPLETED"))
                                         .setHeader("orderMessage", constant("Order completed."))
                         .end()
@@ -121,6 +124,22 @@ public class OrderRoute extends RouteBuilder {
                         .setHeader("seatMessage", simple("${body.seatMessage}"))
                         .setHeader("date", simple("${body.date}"))
                         .setHeader("price", simple("${body.price}"))
+                        .choice()
+                                .when().simple("${header.orderStatus} == 'FAILED'")
+                                        .bean(orderService, "refundBudget")
+                                        .process(exchange -> {
+                                                OrderDto order = exchange.getIn().getBody(OrderDto.class);
+                                                if (order != null) {
+                                                        order.setEventType("CompensateSeat");
+                                                        order.setSagaId(order.getOrderId());
+                                                }
+                                        })
+                                        .setProperty("orderObj", body())
+                                        .marshal().json(JsonLibrary.Jackson)
+                                        .setHeader(KafkaConstants.KEY, simple("${header.orderId}"))
+                                        .to("kafka:compensation-events")
+                                        .setBody(exchangeProperty("orderObj"))
+                        .end()
                         .to("direct:updateOrder");
 
                 from("direct:updateOrder")
@@ -128,12 +147,7 @@ public class OrderRoute extends RouteBuilder {
                         .bean(orderService, "updateOrder")
                         .log("SQL: {{sql.updateOrder}}")
                         .to("sql:{{sql.updateOrder}}")
-                        .log("Order: ${header.orderId} updated.")
-                        .choice()
-                                .when().simple("${body.seatStatus} == 'RESERVED' || ${body.paymentStatus} == 'COMPLETED'")
-                                        .bean(orderService, "updateUserBudget")
-                                
-                        ;
+                        .log("Order: ${header.orderId} updated.");
 
         }
 

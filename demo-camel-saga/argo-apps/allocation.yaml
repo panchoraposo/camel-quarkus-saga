@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-allocation
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/panchoraposo/demo-camel-saga'
+    targetRevision: HEAD
+    path: apps/allocation/overlays/dev
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: allocation
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

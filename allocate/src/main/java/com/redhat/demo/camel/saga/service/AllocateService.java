@@ -27,6 +27,10 @@ public class AllocateService {
         String seatId = order.getSeatId();
         // Verificamos si el asiento ya está ocupado
         Seat seat = seatRepository.findBySeatId(seatId);
+        if (seat == null) {
+            LOG.error("Seat " + seatId + " does not exist.");
+            throw new RuntimeException("Seat " + seatId + " does not exist.");
+        }
         if (seat != null && !seat.getStatus().equalsIgnoreCase("FREE")) {
             LOG.error("Seat " + seatId + " is already allocated.");
             throw new RuntimeException("Seat " + seatId + " is already allocated.");
@@ -34,6 +38,7 @@ public class AllocateService {
         // Lógica para asignar el asiento
         order.setSeatStatus("RESERVED");
         order.setSeatMessage("Seat: " + seatId + " reserved for Order: " + order.getOrderId());
+        order.setPrice(seat.getPrice());
         LOG.info("Seat " + seatId + " reserved.");
         return order;
 
@@ -43,6 +48,13 @@ public class AllocateService {
         LOG.info("Reverting allocation for Order: " + order.getOrderId());
         order.setSeatStatus("FAILED");
         order.setSeatMessage("Seat " + order.getSeatId() + " is already allocated.");
+        return order;
+    }
+
+    public OrderDto releaseSeat(OrderDto order) {
+        LOG.info("Releasing seat due to downstream failure. Order: " + order.getOrderId() + " seat: " + order.getSeatId());
+        order.setSeatStatus("FREE");
+        order.setSeatMessage("Seat " + order.getSeatId() + " released due to payment failure.");
         return order;
     }
 

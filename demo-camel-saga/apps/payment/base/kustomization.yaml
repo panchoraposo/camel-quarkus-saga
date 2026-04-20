@@ -1,0 +1,5 @@
+resources:
+  - deployment.yaml
+  - service.yaml
+  - postgresql/deployment.yaml
+  - postgresql/service.yaml

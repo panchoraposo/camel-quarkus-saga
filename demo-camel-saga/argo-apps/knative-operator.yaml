@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: knative-operator
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/panchoraposo/demo-camel-saga'
+    targetRevision: HEAD
+    path: operators/knative
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: knative
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true

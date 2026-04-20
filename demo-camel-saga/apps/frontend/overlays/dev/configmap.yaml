@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  namespace: frontend
+  labels:
+    app: frontend
+data:
+  REACT_APP_ORDER_API_URL: "https://order-order.apps.cluster-rvwsv.rvwsv.sandbox3546.opentlc.com"
+  REACT_APP_ALLOCATION_API_URL: "https://allocation-allocation.apps.cluster-rvwsv.rvwsv.sandbox3546.opentlc.com"
+  REACT_APP_KEYCLOAK_URL: "https://keycloak-keycloak.apps.cluster-rvwsv.rvwsv.sandbox3546.opentlc.com"
+  REACT_APP_KEYCLOAK_REALM: "camel-saga"
+  REACT_APP_KEYCLOAK_CLIENT_ID: "frontend"

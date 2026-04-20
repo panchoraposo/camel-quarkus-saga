@@ -2,8 +2,6 @@ package com.redhat.demo.camel.saga.service;
 
 import java.time.Instant;
 
-import org.apache.camel.Exchange;
-
 import com.redhat.demo.camel.saga.model.OrderDto;
 import com.redhat.demo.entity.Payment;
 import com.redhat.demo.repository.PaymentRepository;
@@ -25,7 +23,8 @@ public class PaymentService {
         String orderId = order.getOrderId();
         // Crear un ID de pago solo con el orderId
         String paymentId = "PAY-" + orderId;
-        order.setPaymentStatus("COMPLETED");
+        boolean forceFail = order.getForceFailPayment() != null && order.getForceFailPayment().booleanValue();
+        order.setPaymentStatus(forceFail ? "FAILED" : "COMPLETED");
         order.setPaymentId(paymentId);
         order.setDate(Instant.now().toEpochMilli());
         order.setPrice(order.getPrice());
@@ -33,28 +32,41 @@ public class PaymentService {
         order.setOrderId(order.getOrderId());
         order.setSeatId(order.getSeatId());
         order.setOrderStatus(order.getOrderStatus());
-        order.setPaymentMessage("Payment successful");
+        order.setPaymentMessage(forceFail ? "Payment failed (forced for demo)." : "Payment successful");
         
         return order;
 
     }
 
     @Transactional
-    public void cancelPayment(Exchange exchange) {
-        
-        String paymentId = exchange.getMessage().getHeader("paymentId", String.class);
-                        
+    public OrderDto cancelPayment(OrderDto order) {
+        if (order == null) {
+            return null;
+        }
+
+        String paymentId = order.getPaymentId();
+        if (paymentId == null || paymentId.isBlank()) {
+            paymentId = "PAY-" + order.getOrderId();
+            order.setPaymentId(paymentId);
+        }
+
         Payment payment = paymentRepository.findPaymentById(paymentId);
         if (payment == null) {
-            Log.info("Payment does not exist. Nothing to do.");
-            exchange.getMessage().setHeader("paymentStatus", "CANCELLED");
-            exchange.getMessage().setHeader("paymentMessage", "Payment does not exist. Nothing to do.");
+            Log.info("Payment does not exist for paymentId=" + paymentId + ". Marking as CANCELLED for saga.");
+        } else {
+            payment.setStatus("CANCELLED");
         }
-        return;
+
+        order.setPaymentStatus("CANCELLED");
+        order.setPaymentMessage("Payment cancelled due to a downstream/upstream failure.");
+        order.setDate(Instant.now().toEpochMilli());
+        return order;
     }
 
-    public OrderDto paymentCompensation(Exchange exchange) {
-        OrderDto order = exchange.getMessage().getBody(OrderDto.class);
+    public OrderDto paymentCompensation(OrderDto order) {
+        if (order == null) {
+            return null;
+        }
         order.setPaymentStatus("CANCELLED");
         order.setPaymentMessage("Compensation for payment due to an allocation error.");
         order.setDate(Instant.now().toEpochMilli());

@@ -4,17 +4,17 @@ import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.Test;
 
 import static io.restassured.RestAssured.given;
-import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 
 @QuarkusTest
 class OrderResourceTest {
     @Test
-    void testHelloEndpoint() {
+    void ordersEndpointShouldReturnJsonArray() {
         given()
-          .when().get("/order")
+          .when().get("/orders")
           .then()
              .statusCode(200)
-             .body(is("Hello from Quarkus REST"));
+             .body("size()", greaterThanOrEqualTo(0));
     }
 
 }

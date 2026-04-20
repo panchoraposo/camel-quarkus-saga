@@ -1,0 +1,6 @@
+resources:
+  - ../../base
+  #- configmap.yaml
+  - rolebinding.yaml
+  #- route.yaml
+  #- virtual-service.yaml

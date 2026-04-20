@@ -1,0 +1,37 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: order-cors-policy
+  namespace: order
+spec:
+  hosts:
+    - "order-order.apps.cluster-4fg5r.4fg5r.sandbox5322.opentlc.com"
+  gateways:
+    - knative-serving/knative-ingress-gateway
+  http:
+    - match:
+        - uri:
+            prefix: "/"
+      
+      corsPolicy:
+        allowOrigins:
+          - exact: "https://frontend-frontend.apps.cluster-4fg5r.4fg5r.sandbox5322.opentlc.com"
+        
+        allowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+          
+        allowHeaders:
+          - Content-Type
+          - Authorization
+          - Baggage
+          - Sentry-Trace
+
+      route:
+        - destination:
+            host: order.order.svc.cluster.local
+            port:
+              number: 80

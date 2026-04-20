@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: allocation
+  namespace: allocation
+  labels:
+    app: allocation
+    app.openshift.io/runtime: camel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: allocation
+  template:
+    metadata:
+      labels:
+        app: allocation
+    spec:
+      containers:
+        - name: allocation
+          image: image-registry.openshift-image-registry.svc:5000/allocation/allocation:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: QUARKUS_PROFILE
+              value: demo

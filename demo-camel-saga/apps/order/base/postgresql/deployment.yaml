@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders
+  namespace: order
+  labels:
+    app.openshift.io/runtime: postgresql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orders
+  template:
+    metadata:
+      labels:
+        app: orders
+    spec:
+      containers:
+        - name: orders
+          image: registry.redhat.io/rhel10/postgresql-16
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRESQL_USER
+              value: quarkus
+            - name: POSTGRESQL_PASSWORD
+              value: quarkus
+            - name: POSTGRESQL_DATABASE
+              value: orders
+          volumeMounts:
+            - mountPath: /var/lib/pgsql/data
+              name: postgres-storage
+      volumes:
+        - name: postgres-storage
+          emptyDir: {}

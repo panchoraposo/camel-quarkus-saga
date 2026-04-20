@@ -1,0 +1,16 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: allocation
+  namespace: allocation
+  labels:
+    app: allocation
+spec:
+  to:
+    kind: Service
+    name: allocation
+  port:
+    targetPort: 8080
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
