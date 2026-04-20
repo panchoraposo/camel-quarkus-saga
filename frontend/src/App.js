@@ -37,8 +37,35 @@ function SeatSelection() {
   const [forceFailPayment, setForceFailPayment] = useState(false);
   const [me, setMe] = useState(null);
   const [loadingMe, setLoadingMe] = useState(false);
-  const orderBaseUrl = process.env.REACT_APP_ORDER_API_URL || 'http://localhost:8083';
-  const allocationBaseUrl = process.env.REACT_APP_ALLOCATION_API_URL || 'http://localhost:8081';
+  const orderBaseUrl = useMemo(() => {
+    const explicit = String(process.env.REACT_APP_ORDER_API_URL || '').trim();
+    if (explicit) return explicit;
+    try {
+      if (typeof window !== 'undefined') {
+        const h = window.location.hostname;
+        const idx = h.indexOf('.apps.');
+        if (idx > 0) return `${window.location.protocol}//order-order${h.slice(idx)}`;
+      }
+    } catch {
+      // ignore
+    }
+    return 'http://localhost:8083';
+  }, []);
+
+  const allocationBaseUrl = useMemo(() => {
+    const explicit = String(process.env.REACT_APP_ALLOCATION_API_URL || '').trim();
+    if (explicit) return explicit;
+    try {
+      if (typeof window !== 'undefined') {
+        const h = window.location.hostname;
+        const idx = h.indexOf('.apps.');
+        if (idx > 0) return `${window.location.protocol}//allocation-allocation${h.slice(idx)}`;
+      }
+    } catch {
+      // ignore
+    }
+    return 'http://localhost:8081';
+  }, []);
 
   const UNAVAILABLE_STATUS = "RESERVED"; 
 
@@ -130,10 +157,6 @@ function SeatSelection() {
       console.error(error);
     }
   };
-
-  const rows = ['A', 'B', 'C'].map(letter =>
-    seats.filter(seat => seat.seatId.startsWith(letter))
-  );
 
   const zoneForSeat = useCallback((seat) => {
     const p = Number(seat?.price);
@@ -329,11 +352,14 @@ function SeatSelection() {
 
               <div className="seatmap-rows">
                 {seatRows.map(({ row, seats: rowSeats }) => {
-                  const first = rowSeats[0]?.seatId;
-                  const last = rowSeats[rowSeats.length - 1]?.seatId;
+                  const nums = rowSeats
+                    .map(s => parseInt(String(s.seatId || '').slice(1), 10))
+                    .filter(Number.isFinite);
+                  const left = nums.length ? `${row}${Math.max(...nums)}` : `${row}${rowSeats.length}`;
+                  const right = nums.length ? `${row}${Math.min(...nums)}` : row;
                   return (
                     <div key={row} className="seatmap-row">
-                      <div className="seatmap-row-label mono">{first || row}</div>
+                      <div className="seatmap-row-label mono">{left}</div>
                       <div className="seatmap-row-seats">
                         {rowSeats.map((seat) => {
                           const isReserved = seat.status && seat.status.toUpperCase() === UNAVAILABLE_STATUS;
@@ -353,7 +379,7 @@ function SeatSelection() {
                           );
                         })}
                       </div>
-                      <div className="seatmap-row-label mono">{last || row}</div>
+                      <div className="seatmap-row-label mono">{right}</div>
                     </div>
                   );
                 })}

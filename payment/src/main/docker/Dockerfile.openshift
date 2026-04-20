@@ -1,0 +1,11 @@
+FROM docker.io/maven:3.9.9-eclipse-temurin-21 AS build
+WORKDIR /project
+COPY . .
+RUN ./mvnw -DskipTests package -Dquarkus.container-image.build=false -Dquarkus.container-image.push=false
+
+FROM registry.access.redhat.com/ubi8/openjdk-21:1.20
+WORKDIR /deployments
+COPY --from=build /project/target/quarkus-app/ /deployments/quarkus-app/
+EXPOSE 8080
+CMD ["java","-XX:MaxRAMPercentage=80.0","-Dquarkus.http.host=0.0.0.0","-jar","/deployments/quarkus-app/quarkus-run.jar"]
+
