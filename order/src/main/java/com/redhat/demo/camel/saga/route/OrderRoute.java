@@ -50,7 +50,7 @@ public class OrderRoute extends RouteBuilder {
                 from("direct:newOrder")
                         .log("Processing order id: ${header.id}")
                         .setBody(body())
-                        .bean(orderService, "enrichUserFromIdentity")
+                        .bean(orderService, "enrichUserFromBearer")
                         .bean(orderService, "createOrder")
                         .bean(orderService, "reserveBudget")
                         .log("Persisting order in database: ${header.id}")

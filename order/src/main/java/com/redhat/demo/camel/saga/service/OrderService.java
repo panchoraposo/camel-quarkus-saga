@@ -1,8 +1,12 @@
 package com.redhat.demo.camel.saga.service;
 
+import java.nio.charset.StandardCharsets;
 import java.time.temporal.ChronoUnit;
+import java.util.Base64;
+import java.util.Map;
 
 import org.apache.camel.Exchange;
+import org.apache.camel.Header;
 import org.apache.camel.ProducerTemplate;
 import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
 import org.eclipse.microprofile.faulttolerance.Fallback;
@@ -10,13 +14,12 @@ import org.eclipse.microprofile.faulttolerance.Retry;
 import org.eclipse.microprofile.faulttolerance.Timeout;
 import org.jboss.logging.Logger;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.redhat.demo.camel.saga.model.OrderDto;
 import com.redhat.demo.entity.User;
 
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.annotations.RegisterForReflection;
-import io.quarkus.arc.runtime.context.ActivateRequestContext;
-import io.quarkus.security.identity.SecurityIdentity;
 
 import com.redhat.demo.camel.saga.repository.UserRepository;
 
@@ -37,9 +40,6 @@ public class OrderService {
 
     @Inject
     UserRepository userRepository;
-
-    @Inject
-    SecurityIdentity securityIdentity;
 
     // Create order
     @Retry(maxRetries = 3, delay = 2, delayUnit = ChronoUnit.SECONDS)
@@ -65,16 +65,16 @@ public class OrderService {
         return order;
     }
 
-    @ActivateRequestContext
-    public OrderDto enrichUserFromIdentity(OrderDto order) {
+    public OrderDto enrichUserFromBearer(@Header("Authorization") String authorization, OrderDto order) {
         if (order == null) {
             return null;
         }
-        if (securityIdentity == null || securityIdentity.isAnonymous()) {
+        if (authorization == null || !authorization.startsWith("Bearer ")) {
             return order;
         }
 
-        String username = securityIdentity.getPrincipal() != null ? securityIdentity.getPrincipal().getName() : null;
+        String token = authorization.substring("Bearer ".length()).trim();
+        String username = extractPreferredUsername(token);
         if (username == null || username.isBlank()) {
             return order;
         }
@@ -84,6 +84,40 @@ public class OrderService {
             order.setUserId(user.getId());
         }
         return order;
+    }
+
+    private static String extractPreferredUsername(String token) {
+        try {
+            String[] parts = token.split("\\.");
+            if (parts.length < 2) {
+                return null;
+            }
+            byte[] decoded = Base64.getUrlDecoder().decode(padBase64(parts[1]));
+            String json = new String(decoded, StandardCharsets.UTF_8);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> claims = new ObjectMapper().readValue(json, Map.class);
+            Object preferred = claims.get("preferred_username");
+            if (preferred instanceof String && !((String) preferred).isBlank()) {
+                return (String) preferred;
+            }
+            Object upn = claims.get("upn");
+            if (upn instanceof String && !((String) upn).isBlank()) {
+                return (String) upn;
+            }
+            Object email = claims.get("email");
+            if (email instanceof String && !((String) email).isBlank()) {
+                return (String) email;
+            }
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String padBase64(String s) {
+        int mod = s.length() % 4;
+        if (mod == 0) return s;
+        return s + "====".substring(mod);
     }
 
     public OrderDto updateOrder(OrderDto order) {
@@ -115,9 +149,6 @@ public class OrderService {
         }
         if (order.getBudgetReserved() != null && order.getBudgetReserved().booleanValue()) {
             return order;
-        }
-        if (order.getUserId() == null) {
-            enrichUserFromIdentity(order);
         }
         if (order.getUserId() == null) {
             order.setOrderStatus("FAILED");
