@@ -1,5 +1,7 @@
 package com.redhat.demo.camel.saga.route;
 
+import java.util.List;
+
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.kafka.KafkaConstants;
 import org.apache.camel.model.dataformat.JsonLibrary;
@@ -85,16 +87,34 @@ public class AllocateRoute extends RouteBuilder {
                 from("direct:updateSeat")
                         .setHeader("seatId", simple("${header.seatId}"))
                         .setHeader("newStatus", simple("${body.seatStatus}"))
+                        .setHeader("orderId", simple("${body.orderId}"))
+                        .setProperty("orderBeforeSql", body())
                         .choice()
                                 .when().simple("${body.seatStatus} == 'FREE'")
-                                        .setHeader("orderId", constant(null))
+                                        .log("SQL: {{sql.releaseSeat}}")
+                                        .to("sql:{{sql.releaseSeat}}")
                                 .otherwise()
-                                        .setHeader("orderId", simple("${body.orderId}"))
+                                        .log("SQL: {{sql.reserveSeat}}")
+                                        .to("sql:{{sql.reserveSeat}}")
+                                        .process(exchange -> {
+                                                Object raw = exchange.getMessage().getHeader("CamelSqlUpdateCount");
+                                                int updated = 0;
+                                                if (raw instanceof Number) {
+                                                        updated = ((Number) raw).intValue();
+                                                } else if (raw instanceof List) {
+                                                        // Some drivers return a list with one number
+                                                        List<?> l = (List<?>) raw;
+                                                        if (!l.isEmpty() && l.get(0) instanceof Number) {
+                                                                updated = ((Number) l.get(0)).intValue();
+                                                        }
+                                                }
+                                                if (updated == 0) {
+                                                        throw new RuntimeException("Seat " + exchange.getIn().getHeader("seatId") + " is already allocated.");
+                                                }
+                                        })
                         .end()
-                        .log("Headers antes de actualizar en SQL: seatId=${header.seatId}, status=${header.newStatus}")
-                        .log("SQL: {{sql.updateSeat}}")
-                        .to("sql:{{sql.updateSeat}}")
-                        .log("Seat allocated successfully");
+                        .setBody(exchangeProperty("orderBeforeSql"))
+                        .log("Seat updated successfully");
 
                 // Compensation triggered by downstream services (e.g. payment failed) -> release seat
                 from("kafka:compensation-events")
