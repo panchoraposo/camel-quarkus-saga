@@ -193,14 +193,45 @@ function SeatSelection() {
       });
       byRow.set(k, arr);
     }
-    // sort rows by average price desc (closest to stage first)
+    // Stable seatmap layout: keep rows in alphabetical order (A..)
     return Array.from(byRow.entries())
-      .map(([row, arr]) => {
-        const avg = arr.reduce((acc, s) => acc + (Number(s.price) || 0), 0) / Math.max(arr.length, 1);
-        return { row, seats: arr, avg };
-      })
-      .sort((a, b) => b.avg - a.avg);
+      .map(([row, arr]) => ({ row, seats: arr }))
+      .sort((a, b) => a.row.localeCompare(b.row));
   }, [seats]);
+
+  const splitBlocks = useCallback((rowSeats) => {
+    const left = [];
+    const center = [];
+    const right = [];
+    for (const s of rowSeats || []) {
+      const n = Number(String(s.seatId || '').slice(1));
+      if (!Number.isFinite(n)) {
+        center.push(s);
+      } else if (n <= 10) {
+        left.push(s);
+      } else if (n <= 20) {
+        center.push(s);
+      } else {
+        right.push(s);
+      }
+    }
+    return { left, center, right };
+  }, []);
+
+  const tiers = useMemo(() => {
+    const orchestra = [];
+    const mezzanine = [];
+    const balcony = [];
+
+    for (const r of seatRows) {
+      const idx = String(r.row || '').toUpperCase().charCodeAt(0) - 65;
+      if (idx <= 7) orchestra.push(r);        // A..H
+      else if (idx <= 13) mezzanine.push(r);  // I..N
+      else balcony.push(r);                   // O..T
+    }
+
+    return { orchestra, mezzanine, balcony };
+  }, [seatRows]);
 
   const seatStats = useMemo(() => (
     seats.reduce(
@@ -360,46 +391,59 @@ function SeatSelection() {
           </div>
 
           <div className="seats-container">
-            <div className="seatmap">
-              <div className="seatmap-stage">STAGE</div>
+            <div className="venue-map">
+              <div className="venue-stage">STAGE</div>
 
-              <div className="seatmap-rows">
-                {seatRows.map(({ row, seats: rowSeats }) => {
-                  const nums = rowSeats
-                    .map(s => parseInt(String(s.seatId || '').slice(1), 10))
-                    .filter(Number.isFinite);
-                  const left = nums.length ? `${row}${Math.max(...nums)}` : `${row}${rowSeats.length}`;
-                  const right = nums.length ? `${row}${Math.min(...nums)}` : row;
-                  return (
-                    <div key={row} className="seatmap-row">
-                      <div className="seatmap-row-label mono">{left}</div>
-                      <div className="seatmap-row-seats">
-                        {rowSeats.map((seat) => {
-                          const isReserved = seat.status && seat.status.toUpperCase() === UNAVAILABLE_STATUS;
-                          const isSelected = selectedSeat === seat.seatId;
-                          const isFree = String(seat.status || '').toUpperCase() === 'FREE';
-                          const zone = zoneForSeat(seat);
-                          const disableSeat = isReserved && !allowReservedSelection;
-                          return (
-                            <button
-                              key={seat.seatId}
-                              type="button"
-                              className={`seat seatmap-dot zone-${zone} ${isFree ? 'is-free' : ''} ${isSelected ? 'selected' : ''} ${isReserved ? 'not-available' : ''}`}
-                              onClick={() => handleSeatClick(seat.seatId)}
-                              disabled={disableSeat}
-                              aria-label={`${seat.seatId} ${money(seat.price)} ${String(seat.status || '').toUpperCase()}`}
-                              title={`${seat.seatId} · ${money(seat.price)} · ${String(seat.status || '').toUpperCase()}`}
-                            />
-                          );
-                        })}
-                      </div>
-                      <div className="seatmap-row-label mono">{right}</div>
-                    </div>
-                  );
-                })}
-              </div>
+              {[
+                { id: 'orchestra', title: 'ORCHESTRA', rows: tiers.orchestra },
+                { id: 'mezzanine', title: 'MEZZANINE', rows: tiers.mezzanine },
+                { id: 'balcony', title: 'BALCONY', rows: tiers.balcony },
+              ].map((tier) => (
+                <div key={tier.id} className={`venue-tier tier-${tier.id}`}>
+                  <div className="venue-tier-title">{tier.title}</div>
+                  <div className="venue-tier-labels mono">
+                    <span>1–10</span>
+                    <span>11–20</span>
+                    <span>21–30</span>
+                  </div>
 
-              <div className="seatmap-stalls">STALLS</div>
+                  <div className="venue-tier-rows">
+                    {tier.rows.map(({ row, seats: rowSeats }, i) => {
+                      const { left, center, right } = splitBlocks(rowSeats);
+                      const inset = Math.round((1 - i / Math.max(tier.rows.length - 1, 1)) * 22);
+
+                      const renderSeat = (seat) => {
+                        const isReserved = seat.status && seat.status.toUpperCase() === UNAVAILABLE_STATUS;
+                        const isSelected = selectedSeat === seat.seatId;
+                        const isFree = String(seat.status || '').toUpperCase() === 'FREE';
+                        const zone = zoneForSeat(seat);
+                        const disableSeat = isReserved && !allowReservedSelection;
+                        return (
+                          <button
+                            key={seat.seatId}
+                            type="button"
+                            className={`seat seatmap-dot zone-${zone} ${isFree ? 'is-free' : ''} ${isSelected ? 'selected' : ''} ${isReserved ? 'not-available' : ''}`}
+                            onClick={() => handleSeatClick(seat.seatId)}
+                            disabled={disableSeat}
+                            aria-label={`${seat.seatId} ${money(seat.price)} ${String(seat.status || '').toUpperCase()}`}
+                            title={`${seat.seatId} · ${money(seat.price)} · ${String(seat.status || '').toUpperCase()}`}
+                          />
+                        );
+                      };
+
+                      return (
+                        <div key={row} className="venue-row" style={{ '--inset': `${inset}px` }}>
+                          <div className="venue-row-block venue-left">{left.map(renderSeat)}</div>
+                          <div className="venue-row-letter mono">{row}</div>
+                          <div className="venue-row-block venue-center">{center.map(renderSeat)}</div>
+                          <div className="venue-row-letter mono">{row}</div>
+                          <div className="venue-row-block venue-right">{right.map(renderSeat)}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
