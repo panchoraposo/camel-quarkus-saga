@@ -44,7 +44,15 @@ export function AuthProvider({ children }) {
             const p = await keycloak.loadUserProfile();
             if (!cancelled) setProfile(p);
           } catch {
-            // ignore
+            // Fallback to token claims so the UI doesn't show "user".
+            const parsed = keycloak.tokenParsed || {};
+            const fallback = {
+              username: parsed.preferred_username || parsed.upn || parsed.email || null,
+              email: parsed.email || null,
+              firstName: parsed.given_name || null,
+              lastName: parsed.family_name || null,
+            };
+            if (!cancelled) setProfile(fallback);
           }
         }
       })
