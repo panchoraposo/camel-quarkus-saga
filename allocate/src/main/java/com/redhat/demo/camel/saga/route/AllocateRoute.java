@@ -23,6 +23,7 @@ public class AllocateRoute extends RouteBuilder {
 
                 onException(Exception.class)
                         .log("Exception occurred: ${exception.message}")
+                        .useOriginalMessage()
                         .handled(true)
                         .to("direct:seatReserveFailed");
 
@@ -67,10 +68,17 @@ public class AllocateRoute extends RouteBuilder {
                                 if (order == null) {
                                         order = new OrderDto();
                                 }
-                                order.setEventType("SeatReserveFailed");
+                                // Preserve correlation and identifiers even when the original message is missing fields
+                                if (order.getSeatId() == null) {
+                                        order.setSeatId(exchange.getIn().getHeader("seatId", String.class));
+                                }
+                                if (order.getOrderId() == null) {
+                                        order.setOrderId(exchange.getIn().getHeader("orderId", String.class));
+                                }
                                 if (order.getSagaId() == null) {
                                         order.setSagaId(order.getOrderId());
                                 }
+                                order.setEventType("SeatReserveFailed");
                                 if (order.getSeatStatus() == null) {
                                         order.setSeatStatus("FAILED");
                                 }
