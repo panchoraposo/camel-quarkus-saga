@@ -29,7 +29,7 @@ function inferKeycloakUrl() {
 
 const keycloak = new Keycloak({
   url: inferKeycloakUrl(),
-  realm: process.env.REACT_APP_KEYCLOAK_REALM || 'camel-saga',
+  realm: process.env.REACT_APP_KEYCLOAK_REALM || 'ticketblaster',
   clientId: process.env.REACT_APP_KEYCLOAK_CLIENT_ID || 'frontend',
 });
 
