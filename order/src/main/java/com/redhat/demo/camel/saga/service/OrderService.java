@@ -15,6 +15,7 @@ import com.redhat.demo.entity.User;
 
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.annotations.RegisterForReflection;
+import io.quarkus.arc.runtime.ActivateRequestContext;
 import io.quarkus.security.identity.SecurityIdentity;
 
 import com.redhat.demo.camel.saga.repository.UserRepository;
@@ -64,6 +65,7 @@ public class OrderService {
         return order;
     }
 
+    @ActivateRequestContext
     public OrderDto enrichUserFromIdentity(OrderDto order) {
         if (order == null) {
             return null;
