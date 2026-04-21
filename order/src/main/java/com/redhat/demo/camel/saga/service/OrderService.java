@@ -65,6 +65,7 @@ public class OrderService {
         return order;
     }
 
+    @Transactional
     public OrderDto enrichUserFromBearer(@Header("Authorization") String authorization, OrderDto order) {
         if (order == null) {
             return null;
