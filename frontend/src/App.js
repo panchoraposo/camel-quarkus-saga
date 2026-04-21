@@ -36,6 +36,7 @@ function SeatSelection() {
   const [loadingSeats, setLoadingSeats] = useState(false);
   const [forceFailPayment, setForceFailPayment] = useState(false);
   const [allowReservedSelection, setAllowReservedSelection] = useState(false);
+  const [compactSeatmap, setCompactSeatmap] = useState(true);
   const [me, setMe] = useState(null);
   const [loadingMe, setLoadingMe] = useState(false);
   const orderBaseUrl = useMemo(() => {
@@ -233,6 +234,15 @@ function SeatSelection() {
     return { orchestra, mezzanine, balcony };
   }, [seatRows]);
 
+  const tierConfigs = useMemo(
+    () => ([
+      { id: 'orchestra', title: 'ORCHESTRA', rows: tiers.orchestra, insetMax: 26 },
+      { id: 'mezzanine', title: 'MEZZANINE', rows: tiers.mezzanine, insetMax: 18 },
+      { id: 'balcony', title: 'BALCONY', rows: tiers.balcony, insetMax: 12 },
+    ]),
+    [tiers]
+  );
+
   const seatStats = useMemo(() => (
     seats.reduce(
       (acc, s) => {
@@ -384,6 +394,14 @@ function SeatSelection() {
               </div>
             </div>
             <div className="legend">
+              <label className="legend-item" style={{ gap: 6 }}>
+                <input
+                  type="checkbox"
+                  checked={compactSeatmap}
+                  onChange={(e) => setCompactSeatmap(e.target.checked)}
+                />
+                Compacto
+              </label>
               <span className="legend-item"><span className="seat-swatch swatch-free" /> FREE</span>
               <span className="legend-item"><span className="seat-swatch swatch-reserved" /> RESERVED</span>
               <span className="legend-item"><span className="seat-swatch swatch-selected" /> SELECTED</span>
@@ -391,14 +409,10 @@ function SeatSelection() {
           </div>
 
           <div className="seats-container">
-            <div className="venue-map">
+            <div className={`venue-map ${compactSeatmap ? 'is-compact' : ''}`}>
               <div className="venue-stage">STAGE</div>
 
-              {[
-                { id: 'orchestra', title: 'ORCHESTRA', rows: tiers.orchestra },
-                { id: 'mezzanine', title: 'MEZZANINE', rows: tiers.mezzanine },
-                { id: 'balcony', title: 'BALCONY', rows: tiers.balcony },
-              ].map((tier) => (
+              {tierConfigs.map((tier) => (
                 <div key={tier.id} className={`venue-tier tier-${tier.id}`}>
                   <div className="venue-tier-title">{tier.title}</div>
                   <div className="venue-tier-labels mono">
@@ -410,7 +424,10 @@ function SeatSelection() {
                   <div className="venue-tier-rows">
                     {tier.rows.map(({ row, seats: rowSeats }, i) => {
                       const { left, center, right } = splitBlocks(rowSeats);
-                      const inset = Math.round((1 - i / Math.max(tier.rows.length - 1, 1)) * 22);
+                      // Curvature facing the stage: rows closer to the stage should be wider,
+                      // and rows farther away should be slightly narrower.
+                      const t = i / Math.max(tier.rows.length - 1, 1);
+                      const inset = Math.round(t * tier.insetMax);
 
                       const renderSeat = (seat) => {
                         const isReserved = seat.status && seat.status.toUpperCase() === UNAVAILABLE_STATUS;

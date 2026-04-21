@@ -5,7 +5,7 @@
   flex-direction: column;
   gap: 14px;
   justify-content: center;
-  align-items: center;
+  align-items: stretch;
 }
 
 /* Top navigation */
@@ -444,6 +444,20 @@ h3 {
   border-radius: 18px;
   background: rgba(3, 7, 18, 0.28);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  max-height: 720px;
+  overflow: auto;
+}
+
+.venue-map.is-compact {
+  --seat-size: 12px;
+  --seat-gap: 5px;
+  --block-tilt: 4deg;
+}
+
+.venue-map {
+  --seat-size: 14px;
+  --seat-gap: 7px;
+  --block-tilt: 6deg;
 }
 
 .venue-stage {
@@ -457,6 +471,10 @@ h3 {
   padding: 10px 12px;
   border-radius: 999px;
   margin-bottom: 14px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  backdrop-filter: blur(8px);
 }
 
 .venue-tier {
@@ -507,17 +525,18 @@ h3 {
 .venue-row-block {
   display: flex;
   justify-content: center;
-  gap: 8px;
+  gap: var(--seat-gap, 8px);
   flex-wrap: nowrap;
 }
 
 .venue-left {
-  transform: rotate(-6deg);
+  /* Flip curvature so the blocks "face" the stage */
+  transform: rotate(var(--block-tilt, 6deg));
   transform-origin: right center;
 }
 
 .venue-right {
-  transform: rotate(6deg);
+  transform: rotate(calc(-1 * var(--block-tilt, 6deg)));
   transform-origin: left center;
 }
 
@@ -579,8 +598,8 @@ h3 {
 }
 
 .seatmap-dot.seat {
-  width: 18px;
-  height: 18px;
+  width: var(--seat-size, 18px);
+  height: var(--seat-size, 18px);
   padding: 0;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.16);
