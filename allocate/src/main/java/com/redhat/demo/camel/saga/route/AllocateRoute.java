@@ -124,7 +124,20 @@ public class AllocateRoute extends RouteBuilder {
                         .setHeader("seatId", simple("${body.seatId}"))
                         .setHeader("orderId", simple("${body.orderId}"))
                         .bean(allocateService, "releaseSeat")
-                        .to("direct:updateSeat");
+                        .process(exchange -> {
+                                OrderDto order = exchange.getIn().getBody(OrderDto.class);
+                                if (order != null) {
+                                        order.setEventType("SeatReleased");
+                                        if (order.getSagaId() == null) {
+                                                order.setSagaId(order.getOrderId());
+                                        }
+                                }
+                        })
+                        .to("direct:updateSeat")
+                        .marshal().json(JsonLibrary.Jackson)
+                        .setHeader(KafkaConstants.KEY, simple("${header.orderId}"))
+                        .log("Publishing SeatReleased to seat-events: ${body}")
+                        .to("kafka:seat-events");
 
         }
 }

@@ -103,6 +103,17 @@ public class OrderRoute extends RouteBuilder {
                         .bean(orderService, "refundBudget")
                         .to("direct:updateOrder");
 
+                // Seat release due to compensation (allocate publishes SeatReleased after CompensateSeat)
+                from("kafka:seat-events")
+                        .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
+                        .filter().simple("${body.eventType} == 'SeatReleased'")
+                        .log("Seat released after compensation: ${body.seatMessage}")
+                        .setHeader("orderId", simple("${body.orderId}"))
+                        .setHeader("seatStatus", simple("${body.seatStatus}"))
+                        .setHeader("seatMessage", simple("${body.seatMessage}"))
+                        .log("SQL: {{sql.updateOrderSeat}}")
+                        .to("sql:{{sql.updateOrderSeat}}");
+
                 from("kafka:payment-events")
                         .log("Raw Payment event from Kafka: ${body}")
                         .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
