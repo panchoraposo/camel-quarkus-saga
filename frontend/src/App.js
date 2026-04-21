@@ -125,6 +125,19 @@ function SeatSelection() {
       setStatus(`Modo demo: seleccionaste ${seatId} aunque ya esté reservado. Al generar la orden, la SAGA debería fallar y compensar.`);
     }
     setSelectedSeat(seatId);
+    // Clear any previous success/error when changing seat,
+    // then optionally show budget warning for the selected seat.
+    const b = Number(me?.budget);
+    const p = Number(seat?.price);
+    const budgetKnown = authenticated && !loadingMe && Number.isFinite(b);
+    const priceKnown = Number.isFinite(p);
+
+    if (budgetKnown && priceKnown && b < p) {
+      setStatusTone('bad');
+      setStatus(`Saldo insuficiente: tienes ${money(b)} y el asiento cuesta ${money(p)}.`);
+      return;
+    }
+
     setStatusTone('neutral');
     if (!(seat && seat.status && seat.status.toUpperCase() === UNAVAILABLE_STATUS && allowReservedSelection)) {
       setStatus('');
@@ -172,9 +185,24 @@ function SeatSelection() {
       }, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setStatusTone('ok');
-      setStatus(`Orden creada. Sigue el flujo en “Órdenes / Timeline”.`);
-      console.log(response.data);
+      // The backend sometimes returns a JSON string instead of an object.
+      // Also, "FAILED" means the order was rejected (no saga started).
+      let payload = response.data;
+      try {
+        if (typeof payload === 'string') payload = JSON.parse(payload);
+      } catch {
+        // ignore
+      }
+
+      const st = String(payload?.orderStatus || '').toUpperCase();
+      if (st === 'FAILED' || st === 'CANCELLED') {
+        setStatusTone('bad');
+        setStatus(payload?.orderMessage || 'La orden fue rechazada.');
+      } else {
+        setStatusTone('ok');
+        setStatus('Orden creada. Sigue el flujo en “Órdenes / Timeline”.');
+      }
+      console.log(payload);
 
       await refreshSeats();
       await refreshMe();
