@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import "./OrdersOverview.css";
 import moment from "moment";
 import "moment/locale/es";
+import { useAuth } from "./auth/AuthContext";
 
 const REFRESH_MS = 2000;
 
@@ -37,12 +38,18 @@ const OrdersOverview = () => {
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
+  const [error, setError] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const { token, profile } = useAuth();
   const orderBaseUrl = process.env.REACT_APP_ORDER_API_URL || 'http://localhost:8083';
 
   const fetchOrders = useCallback(async () => {
-    const ordersRes = await fetch(`${orderBaseUrl}/orders`);
+    const ordersRes = await fetch(`${orderBaseUrl}/orders`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
     if (!ordersRes.ok) {
-      throw new Error(`orders fetch failed: ${ordersRes.status}`);
+      const txt = await ordersRes.text().catch(() => "");
+      throw new Error(`orders fetch failed: ${ordersRes.status}${txt ? ` — ${txt}` : ""}`);
     }
     const ordersData = await ordersRes.json();
 
@@ -57,8 +64,9 @@ const OrdersOverview = () => {
     }));
 
     setOrders(detailedOrders);
+    setError(null);
     setLastUpdatedAt(Date.now());
-  }, [orderBaseUrl]);
+  }, [orderBaseUrl, token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,7 +74,10 @@ const OrdersOverview = () => {
       try {
         await fetchOrders();
       } catch (err) {
-        if (!cancelled) console.error("Error fetching orders:", err);
+        if (!cancelled) {
+          console.error("Error fetching orders:", err);
+          setError(err?.message || "No se pudo cargar órdenes.");
+        }
       }
     };
 
@@ -84,6 +95,20 @@ const OrdersOverview = () => {
     if (!selectedOrderId) return null;
     return orders.find((o) => o.orderId === selectedOrderId) || null;
   }, [orders, selectedOrderId]);
+
+  const filteredOrders = useMemo(() => {
+    const list = [...orders].sort((a, b) => (b?.date || 0) - (a?.date || 0));
+    if (statusFilter === "ALL") return list;
+    return list.filter((o) => normStatus(o.orderStatus) === statusFilter);
+  }, [orders, statusFilter]);
+
+  const summary = useMemo(() => {
+    const all = orders.length;
+    const completed = orders.filter((o) => normStatus(o.orderStatus) === "COMPLETED").length;
+    const failed = orders.filter((o) => ["FAILED", "CANCELLED"].includes(normStatus(o.orderStatus))).length;
+    const pending = orders.filter((o) => normStatus(o.orderStatus) === "PENDING").length;
+    return { all, completed, failed, pending };
+  }, [orders]);
 
   const sagaSteps = useMemo(() => {
     if (!selectedOrder) return [];
@@ -120,82 +145,138 @@ const OrdersOverview = () => {
   }, [selectedOrder]);
 
   return (
-    <div className="container">
-      <div className="orders-header">
-        <div>
-          <h1>Resumen de Órdenes (SAGA)</h1>
-          <div className="muted">
-            Topics: <code>order-events</code> → <code>seat-events</code> → <code>payment-events</code> (y <code>compensation-events</code>)
+    <div className="orders-page">
+      <div className="orders-hero">
+        <div className="orders-hero-left">
+          <div className="orders-kicker">Kafka choreography · Live trace</div>
+          <h1 className="orders-title">Órdenes / Timeline</h1>
+          <div className="orders-subtitle">
+            Selecciona una orden para ver el estado por microservicio y las compensaciones.
+          </div>
+
+          <div className="orders-pipeline">
+            <span className="pipe-node">order-events</span>
+            <span className="pipe-arrow">→</span>
+            <span className="pipe-node">seat-events</span>
+            <span className="pipe-arrow">→</span>
+            <span className="pipe-node">payment-events</span>
+            <span className="pipe-arrow">→</span>
+            <span className="pipe-node dim">compensation-events</span>
           </div>
         </div>
 
-        <div className="orders-controls">
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-            />
-            Auto refresh ({REFRESH_MS / 1000}s)
-          </label>
-          <button className="btn" onClick={() => fetchOrders()} type="button">Actualizar</button>
-          <div className="muted small">
-            {lastUpdatedAt ? `Última actualización: ${moment(lastUpdatedAt).format("HH:mm:ss")}` : "Sin datos"}
+        <div className="orders-hero-right">
+          <div className="orders-metrics">
+            <div className="metric">
+              <div className="metric-label">Total</div>
+              <div className="metric-value">{summary.all}</div>
+            </div>
+            <div className="metric">
+              <div className="metric-label">Completed</div>
+              <div className="metric-value ok">{summary.completed}</div>
+            </div>
+            <div className="metric">
+              <div className="metric-label">Failed</div>
+              <div className="metric-value bad">{summary.failed}</div>
+            </div>
+            <div className="metric">
+              <div className="metric-label">Pending</div>
+              <div className="metric-value pending">{summary.pending}</div>
+            </div>
+          </div>
+
+          <div className="orders-controls">
+            <div className="muted small right">
+              {profile?.username ? <>User: <span className="mono">{profile.username}</span></> : null}
+            </div>
+            <label className="toggle">
+              <input
+                type="checkbox"
+                checked={autoRefresh}
+                onChange={(e) => setAutoRefresh(e.target.checked)}
+              />
+              Auto refresh ({REFRESH_MS / 1000}s)
+            </label>
+            <button className="btn" onClick={() => fetchOrders()} type="button">Actualizar</button>
+            <div className="muted small right">
+              {lastUpdatedAt ? `Última actualización: ${moment(lastUpdatedAt).format("HH:mm:ss")}` : "Sin datos"}
+            </div>
           </div>
         </div>
       </div>
 
+      {error ? (
+        <div className="orders-alert">
+          <div className="orders-alert-title">No pudimos cargar órdenes</div>
+          <div className="orders-alert-body mono">{error}</div>
+        </div>
+      ) : null}
+
       <div className="orders-layout">
-        <div className="orders-table-container">
-          <table className="orders-table">
-            <thead>
-              <tr>
-                <th>Order ID</th>
-                <th>User</th>
-                <th>Order</th>
-                <th>Allocation</th>
-                <th>Payment</th>
-                <th>Fecha</th>
-                <th>Precio</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((order) => {
+        <div className="orders-list-panel">
+          <div className="orders-list-header">
+            <div className="filters">
+              <button className={`chip ${statusFilter === "ALL" ? "active" : ""}`} onClick={() => setStatusFilter("ALL")} type="button">Todas</button>
+              <button className={`chip ${statusFilter === "COMPLETED" ? "active" : ""}`} onClick={() => setStatusFilter("COMPLETED")} type="button">Completed</button>
+              <button className={`chip ${statusFilter === "PENDING" ? "active" : ""}`} onClick={() => setStatusFilter("PENDING")} type="button">Pending</button>
+              <button className={`chip ${statusFilter === "FAILED" ? "active" : ""}`} onClick={() => setStatusFilter("FAILED")} type="button">Failed</button>
+            </div>
+            <div className="muted small right mono">{filteredOrders.length} items</div>
+          </div>
+
+          {filteredOrders.length === 0 ? (
+            <div className="empty big">
+              <div className="title">Aún no hay órdenes</div>
+              <div className="muted">Crea una compra desde “Reservar asiento” para ver el flujo aquí.</div>
+              <button className="btn-secondary" type="button" onClick={() => (window.location.href = "/")}>Ir a reservar</button>
+            </div>
+          ) : (
+            <div className="orders-cards">
+              {filteredOrders.map((order) => {
                 const selected = order.orderId === selectedOrderId;
                 return (
-                  <tr
+                  <button
                     key={order.orderId}
-                    className={selected ? "row-selected" : ""}
+                    className={`order-card ${selected ? "selected" : ""}`}
                     onClick={() => setSelectedOrderId(order.orderId)}
-                    role="button"
-                    tabIndex={0}
+                    type="button"
                   >
-                    <td className="mono">{order.orderId}</td>
-                    <td className="mono">{order.userId ?? "N/A"}</td>
-
-                    <td>
+                    <div className="order-card-top">
+                      <div className="order-id mono">{order.orderId}</div>
                       <span className={`badge tone-${statusTone(order.orderStatus)}`}>{normStatus(order.orderStatus)}</span>
-                      <span className="tooltip" title={order.orderMessage || "No additional info"}>ℹ️</span>
-                    </td>
-
-                    <td>
-                      <span className={`badge tone-${statusTone(order.seatStatus)}`}>{normStatus(order.seatStatus)}</span>
-                      <span className="mono muted"> {order.seatId || "N/A"}</span>
-                      <span className="tooltip" title={order.seatMessage || "No additional info"}>ℹ️</span>
-                    </td>
-
-                    <td>
-                      <span className={`badge tone-${statusTone(order.paymentStatus)}`}>{normStatus(order.paymentStatus)}</span>
-                      <span className="tooltip" title={order.paymentMessage || "No additional info"}>ℹ️</span>
-                    </td>
-
-                    <td>{order.date ? moment(order.date).format("DD/MM HH:mm:ss") : "N/A"}</td>
-                    <td>{formatMoney(order.price)}</td>
-                  </tr>
+                    </div>
+                    <div className="order-card-mid">
+                      <div className="kv">
+                        <div className="k">Seat</div>
+                        <div className="v mono">{order.seatId ?? "N/A"}</div>
+                      </div>
+                      <div className="kv">
+                        <div className="k">Price</div>
+                        <div className="v mono">{formatMoney(order.price)}</div>
+                      </div>
+                      <div className="kv">
+                        <div className="k">User</div>
+                        <div className="v mono">{order.userId ?? "N/A"}</div>
+                      </div>
+                      <div className="kv">
+                        <div className="k">Time</div>
+                        <div className="v">{order.date ? moment(order.date).format("DD/MM HH:mm:ss") : "N/A"}</div>
+                      </div>
+                    </div>
+                    <div className="order-card-bottom">
+                      <span className={`mini tone-${statusTone(order.seatStatus)}`}>ALLOC {normStatus(order.seatStatus)}</span>
+                      <span className={`mini tone-${statusTone(order.paymentStatus)}`}>PAY {normStatus(order.paymentStatus)}</span>
+                      {order.orderMessage ? (
+                        <span className="mini-msg" title={order.orderMessage}>{order.orderMessage}</span>
+                      ) : (
+                        <span className="mini-msg muted">Sin mensaje</span>
+                      )}
+                    </div>
+                  </button>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
 
         <div className="order-details">
@@ -210,7 +291,7 @@ const OrdersOverview = () => {
             <>
               <div className="details-header">
                 <div>
-                  <div className="title">Detalle</div>
+                  <div className="title">Detalle / Trace</div>
                   <div className="muted mono">{selectedOrder.orderId}</div>
                 </div>
                 <button className="btn-secondary" type="button" onClick={() => setSelectedOrderId(null)}>Cerrar</button>
