@@ -272,17 +272,11 @@ function SeatSelection() {
             </div>
           </div>
 
-          <div className="card-actions" style={{ justifyContent: 'flex-start', gap: 8, marginTop: 12 }}>
-            {!authenticated ? (
-              <button className="btn-primary" type="button" onClick={login} disabled={!ready}>
-                Iniciar sesión (Keycloak)
-              </button>
-            ) : (
-              <button className="btn-secondary" type="button" onClick={logout}>
-                Cerrar sesión
-              </button>
-            )}
-          </div>
+          {!authenticated ? (
+            <div className="hint muted" style={{ marginTop: 12 }}>
+              Usa <span className="mono">Entrar</span> en la barra superior para iniciar sesión con Keycloak.
+            </div>
+          ) : null}
 
           <div className="summary">
             <div className="kv">

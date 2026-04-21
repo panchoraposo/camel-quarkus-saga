@@ -17,7 +17,7 @@ function inferKeycloakUrl() {
       if (idx > 0) {
         const suffix = u.hostname.slice(idx); // includes ".apps...."
         const proto = u.protocol === 'http:' ? 'http:' : 'https:';
-        return `${proto}//keycloak-keycloak${suffix}`;
+        return `${proto}//keycloak-ingress-keycloak${suffix}`;
       }
     } catch {
       // ignore

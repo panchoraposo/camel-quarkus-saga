@@ -10,6 +10,20 @@ const AuthContext = createContext({
   logout: () => {},
 });
 
+// React.StrictMode runs effects twice in dev. Keycloak init is not safe to run twice,
+// so we guard it with a module-level singleton promise.
+let initPromise = null;
+function initKeycloakOnce() {
+  if (!initPromise) {
+    initPromise = keycloak.init({
+      onLoad: 'check-sso',
+      pkceMethod: 'S256',
+      checkLoginIframe: false,
+    });
+  }
+  return initPromise;
+}
+
 export function AuthProvider({ children }) {
   const [ready, setReady] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
@@ -18,12 +32,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     let cancelled = false;
-    keycloak
-      .init({
-        onLoad: 'check-sso',
-        pkceMethod: 'S256',
-        checkLoginIframe: false,
-      })
+    initKeycloakOnce()
       .then(async (auth) => {
         if (cancelled) return;
         setAuthenticated(Boolean(auth));
