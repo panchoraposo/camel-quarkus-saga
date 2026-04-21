@@ -16,7 +16,8 @@ let initPromise = null;
 function initKeycloakOnce() {
   if (!initPromise) {
     initPromise = keycloak.init({
-      onLoad: 'check-sso',
+      // Hard-require auth for the demo: if not logged in, redirect to Keycloak.
+      onLoad: 'login-required',
       pkceMethod: 'S256',
       checkLoginIframe: false,
     });

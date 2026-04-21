@@ -287,7 +287,7 @@ function SeatSelection() {
           <div className="card-header">
             <div>
               <div className="card-title">Compra</div>
-              <div className="card-subtitle">Inicia sesión y elige un asiento</div>
+              <div className="card-subtitle">Elige un asiento y confirma tu compra</div>
             </div>
             <div className="card-actions">
               <button className="btn-secondary" type="button" onClick={refreshSeats} disabled={loadingSeats}>
@@ -321,9 +321,9 @@ function SeatSelection() {
             </div>
           </div>
 
-          {!authenticated ? (
+          {!ready ? (
             <div className="hint muted" style={{ marginTop: 12 }}>
-              Usa <span className="mono">Entrar</span> en la barra superior para iniciar sesión con Keycloak.
+              Conectando con Keycloak…
             </div>
           ) : null}
 
@@ -429,32 +429,36 @@ function SeatSelection() {
                       const t = i / Math.max(tier.rows.length - 1, 1);
                       const inset = Math.round(t * tier.insetMax);
 
-                      const renderSeat = (seat) => {
+                      const renderSeat = (seat, idx, len) => {
                         const isReserved = seat.status && seat.status.toUpperCase() === UNAVAILABLE_STATUS;
                         const isSelected = selectedSeat === seat.seatId;
                         const isFree = String(seat.status || '').toUpperCase() === 'FREE';
                         const zone = zoneForSeat(seat);
                         const disableSeat = isReserved && !allowReservedSelection;
+                        const c = (len - 1) / 2;
+                        const dist = Math.abs(idx - c);
+                        const bend = dist * (compactSeatmap ? 0.8 : 1.2);
                         return (
-                          <button
-                            key={seat.seatId}
-                            type="button"
-                            className={`seat seatmap-dot zone-${zone} ${isFree ? 'is-free' : ''} ${isSelected ? 'selected' : ''} ${isReserved ? 'not-available' : ''}`}
-                            onClick={() => handleSeatClick(seat.seatId)}
-                            disabled={disableSeat}
-                            aria-label={`${seat.seatId} ${money(seat.price)} ${String(seat.status || '').toUpperCase()}`}
-                            title={`${seat.seatId} · ${money(seat.price)} · ${String(seat.status || '').toUpperCase()}`}
-                          />
+                          <span key={seat.seatId} className="seat-arc" style={{ '--bend': `${bend}px` }}>
+                            <button
+                              type="button"
+                              className={`seat seatmap-dot zone-${zone} ${isFree ? 'is-free' : ''} ${isSelected ? 'selected' : ''} ${isReserved ? 'not-available' : ''}`}
+                              onClick={() => handleSeatClick(seat.seatId)}
+                              disabled={disableSeat}
+                              aria-label={`${seat.seatId} ${money(seat.price)} ${String(seat.status || '').toUpperCase()}`}
+                              title={`${seat.seatId} · ${money(seat.price)} · ${String(seat.status || '').toUpperCase()}`}
+                            />
+                          </span>
                         );
                       };
 
                       return (
                         <div key={row} className="venue-row" style={{ '--inset': `${inset}px` }}>
-                          <div className="venue-row-block venue-left">{left.map(renderSeat)}</div>
+                          <div className="venue-row-block venue-left">{left.map((s, idx) => renderSeat(s, idx, left.length))}</div>
                           <div className="venue-row-letter mono">{row}</div>
-                          <div className="venue-row-block venue-center">{center.map(renderSeat)}</div>
+                          <div className="venue-row-block venue-center">{center.map((s, idx) => renderSeat(s, idx, center.length))}</div>
                           <div className="venue-row-letter mono">{row}</div>
-                          <div className="venue-row-block venue-right">{right.map(renderSeat)}</div>
+                          <div className="venue-row-block venue-right">{right.map((s, idx) => renderSeat(s, idx, right.length))}</div>
                         </div>
                       );
                     })}
@@ -480,17 +484,15 @@ function Topbar() {
           <Link to="/orders" className="nav-link">Órdenes / Timeline</Link>
         </nav>
         <div className="nav" style={{ marginLeft: 'auto', gap: 10 }}>
-          {ready && authenticated ? (
+          {!ready ? (
+            <span className="muted mono">auth…</span>
+          ) : (
             <>
               <span className="muted mono" title="Usuario autenticado">
-                {profile?.username || profile?.email || 'user'}
+                {profile?.username || profile?.email || '—'}
               </span>
               <button className="btn-secondary" type="button" onClick={logout}>Salir</button>
             </>
-          ) : (
-            <button className="btn-secondary" type="button" onClick={login} disabled={!ready}>
-              Entrar
-            </button>
           )}
         </div>
       </div>
