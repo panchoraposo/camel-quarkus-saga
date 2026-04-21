@@ -206,6 +206,12 @@ function SeatSelection() {
 
       await refreshSeats();
       await refreshMe();
+      // Seat conflicts & compensations are async; refresh again so the UI
+      // picks up budget refunds and released seats without manual reload.
+      window.setTimeout(() => {
+        refreshSeats();
+        refreshMe();
+      }, 7000);
     } catch (error) {
       setStatusTone('bad');
       setStatus(`Error al crear orden para el asiento ${selectedSeat}`);
