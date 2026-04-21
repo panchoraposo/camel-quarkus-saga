@@ -35,6 +35,7 @@ function SeatSelection() {
   const [statusTone, setStatusTone] = useState('neutral');
   const [loadingSeats, setLoadingSeats] = useState(false);
   const [forceFailPayment, setForceFailPayment] = useState(false);
+  const [allowReservedSelection, setAllowReservedSelection] = useState(false);
   const [me, setMe] = useState(null);
   const [loadingMe, setLoadingMe] = useState(false);
   const orderBaseUrl = useMemo(() => {
@@ -113,13 +114,20 @@ function SeatSelection() {
   const handleSeatClick = (seatId) => {
     const seat = seats.find(s => s.seatId === seatId);
     if (seat && seat.status && seat.status.toUpperCase() === UNAVAILABLE_STATUS) {
-      setStatusTone('bad');
-      setStatus(`El asiento ${seatId} ya está reservado.`);
-      return;
+      if (!allowReservedSelection) {
+        setStatusTone('bad');
+        setStatus(`El asiento ${seatId} ya está reservado.`);
+        return;
+      }
+      // Demo mode: allow selecting reserved seats to simulate races/late conflicts
+      setStatusTone('pending');
+      setStatus(`Modo demo: seleccionaste ${seatId} aunque ya esté reservado. Al generar la orden, la SAGA debería fallar y compensar.`);
     }
     setSelectedSeat(seatId);
     setStatusTone('neutral');
-    setStatus('');
+    if (!(seat && seat.status && seat.status.toUpperCase() === UNAVAILABLE_STATUS && allowReservedSelection)) {
+      setStatus('');
+    }
   };
 
   const handlePayment = async () => {
@@ -214,10 +222,10 @@ function SeatSelection() {
     <div className="page">
       <div className="hero">
         <div>
-          <div className="hero-kicker">Distributed transactions</div>
-          <h1 className="hero-title">SAGA Demo</h1>
+          <div className="hero-kicker">Ticketing · Distributed transactions</div>
+          <h1 className="hero-title">TicketBlaster Live</h1>
           <div className="hero-subtitle">
-            Selecciona un asiento, genera una orden y mira el timeline de eventos y compensaciones.
+            Selecciona un asiento, compra tu ticket y mira el timeline de eventos y compensaciones.
           </div>
         </div>
         <div className="hero-meta">
@@ -304,6 +312,17 @@ function SeatSelection() {
             </label>
           </div>
 
+          <div className="field" style={{ marginTop: 10 }}>
+            <label className="label" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input
+                type="checkbox"
+                checked={allowReservedSelection}
+                onChange={(e) => setAllowReservedSelection(e.target.checked)}
+              />
+              Modo carrera: permitir seleccionar asientos ya reservados (para simular conflicto)
+            </label>
+          </div>
+
           <button className="btn-primary" onClick={handlePayment} disabled={!canSubmit}>
             Generar orden
           </button>
@@ -360,13 +379,14 @@ function SeatSelection() {
                           const isSelected = selectedSeat === seat.seatId;
                           const isFree = String(seat.status || '').toUpperCase() === 'FREE';
                           const zone = zoneForSeat(seat);
+                          const disableSeat = isReserved && !allowReservedSelection;
                           return (
                             <button
                               key={seat.seatId}
                               type="button"
                               className={`seat seatmap-dot zone-${zone} ${isFree ? 'is-free' : ''} ${isSelected ? 'selected' : ''} ${isReserved ? 'not-available' : ''}`}
                               onClick={() => handleSeatClick(seat.seatId)}
-                              disabled={isReserved}
+                              disabled={disableSeat}
                               aria-label={`${seat.seatId} ${money(seat.price)} ${String(seat.status || '').toUpperCase()}`}
                               title={`${seat.seatId} · ${money(seat.price)} · ${String(seat.status || '').toUpperCase()}`}
                             />
@@ -393,7 +413,7 @@ function Topbar() {
   return (
     <div className="topbar">
       <div className="topbar-inner">
-        <div className="brand">Camel Quarkus SAGA</div>
+        <div className="brand">TicketBlaster</div>
         <nav className="nav">
           <Link to="/" className="nav-link">Reservar asiento</Link>
           <Link to="/orders" className="nav-link">Órdenes / Timeline</Link>
