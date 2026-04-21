@@ -146,6 +146,24 @@ function SeatSelection() {
     const selectedSeatData = seats.find(seat => seat.seatId === selectedSeat);
     const price = selectedSeatData ? selectedSeatData.price : 0;
 
+    if (loadingMe) {
+      setStatusTone('pending');
+      setStatus('Validando tu saldo… intenta nuevamente en un momento.');
+      return;
+    }
+    const b = Number(me?.budget);
+    const p = Number(price);
+    if (!Number.isFinite(b)) {
+      setStatusTone('bad');
+      setStatus('No se pudo validar tu saldo. Refresca la página o vuelve a iniciar sesión.');
+      return;
+    }
+    if (Number.isFinite(p) && b < p) {
+      setStatusTone('bad');
+      setStatus(`Saldo insuficiente: tienes ${money(b)} y el asiento cuesta ${money(p)}.`);
+      return;
+    }
+
     try {
       const response = await axios.post(`${orderBaseUrl}/order`, {
         seatId: selectedSeat,
@@ -257,7 +275,25 @@ function SeatSelection() {
   ), [seats]);
 
   const selectedSeatObj = seats.find((s) => s.seatId === selectedSeat);
-  const canSubmit = Boolean(authenticated && selectedSeat) && !(selectedSeatObj && String(selectedSeatObj.status || '').toUpperCase() === UNAVAILABLE_STATUS);
+  const selectedPrice = useMemo(() => {
+    const n = Number(selectedSeatObj?.price);
+    return Number.isFinite(n) ? n : null;
+  }, [selectedSeatObj]);
+
+  const budget = useMemo(() => {
+    const n = Number(me?.budget);
+    return Number.isFinite(n) ? n : null;
+  }, [me]);
+
+  const budgetReady = Boolean(authenticated && !loadingMe && budget !== null);
+  const insufficientBudget = Boolean(selectedPrice !== null && budgetReady && budget < selectedPrice);
+  const isReserved = Boolean(selectedSeatObj && String(selectedSeatObj.status || '').toUpperCase() === UNAVAILABLE_STATUS);
+
+  const canSubmit =
+    Boolean(authenticated && selectedSeat) &&
+    budgetReady &&
+    !insufficientBudget &&
+    !(isReserved && !allowReservedSelection);
 
   return (
     <div className="page">
@@ -367,6 +403,19 @@ function SeatSelection() {
           <button className="btn-primary" onClick={handlePayment} disabled={!canSubmit}>
             Generar orden
           </button>
+
+          {insufficientBudget ? (
+            <div className="hint" style={{ marginTop: 10, color: 'rgba(254, 202, 202, 0.92)' }}>
+              Saldo insuficiente: tienes <span className="mono">{money(budget)}</span> y el asiento cuesta{' '}
+              <span className="mono">{money(selectedPrice)}</span>.
+            </div>
+          ) : null}
+
+          {!budgetReady && authenticated ? (
+            <div className="hint muted" style={{ marginTop: 10 }}>
+              {loadingMe ? 'Validando saldo…' : 'No pudimos validar tu saldo (no se habilita compra).'}
+            </div>
+          ) : null}
 
           {status ? (
             <div className={`alert tone-${statusTone}`}>
