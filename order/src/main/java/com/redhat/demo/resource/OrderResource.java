@@ -11,6 +11,7 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
+import jakarta.annotation.security.RolesAllowed;
 
 @Path("/orders")
 public class OrderResource {
@@ -22,12 +23,14 @@ public class OrderResource {
     ProducerTemplate producerTemplate;
 
     @GET
+    @RolesAllowed("admin")
     public List<Order> getAllOrders() {
         return orderRepository.listAll();
     }
 
     @GET
     @Path("/{id}")
+    @RolesAllowed("admin")
     public Order getOrder(@PathParam("id") Long id) {
         return orderRepository.findById(id);
     }

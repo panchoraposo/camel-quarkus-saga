@@ -71,7 +71,8 @@ function SeatSelection() {
 
   const UNAVAILABLE_STATUS = "RESERVED"; 
 
-  const { ready, authenticated, token, profile, login, logout } = useAuth();
+  const { ready, authenticated, token, profile, roles, authDegraded, login, logout } = useAuth();
+  const isAdmin = Boolean(Array.isArray(roles) && roles.includes('admin'));
 
   const refreshSeats = useCallback(async () => {
     setLoadingSeats(true);
@@ -382,6 +383,16 @@ function SeatSelection() {
               </div>
             </div>
             <div className="kv">
+              <div className="k">Rol</div>
+              <div className="v">
+                {authenticated ? (
+                  isAdmin ? <span className="badge tone-ok">ADMIN</span> : <span className="badge tone-neutral">USER</span>
+                ) : (
+                  '—'
+                )}
+              </div>
+            </div>
+            <div className="kv">
               <div className="k">Usuario</div>
               <div className="v mono">{authenticated ? (profile?.username || profile?.email || '—') : '—'}</div>
             </div>
@@ -394,6 +405,11 @@ function SeatSelection() {
           {!ready ? (
             <div className="hint muted" style={{ marginTop: 12 }}>
               Conectando con Keycloak…
+            </div>
+          ) : null}
+          {authDegraded && authenticated ? (
+            <div className="hint" style={{ marginTop: 10, color: 'rgba(253, 230, 138, 0.95)' }}>
+              Auth degradado: esperando a que Keycloak vuelva (failover/rollout). Mantendremos tu sesión mientras el token sea válido.
             </div>
           ) : null}
 
@@ -557,14 +573,15 @@ function SeatSelection() {
 }
 
 function Topbar() {
-  const { ready, authenticated, profile, login, logout } = useAuth();
+  const { ready, authenticated, profile, roles, login, logout } = useAuth();
+  const isAdmin = Boolean(Array.isArray(roles) && roles.includes('admin'));
   return (
     <div className="topbar">
       <div className="topbar-inner">
         <div className="brand">TicketBlaster</div>
         <nav className="nav">
           <Link to="/" className="nav-link">Reservar asiento</Link>
-          <Link to="/orders" className="nav-link">Órdenes / Timeline</Link>
+          {isAdmin ? <Link to="/orders" className="nav-link">Órdenes / Timeline</Link> : null}
         </nav>
         <div className="nav" style={{ marginLeft: 'auto', gap: 10 }}>
           {!ready ? (
@@ -583,14 +600,40 @@ function Topbar() {
   );
 }
 
+function Unauthorized() {
+  return (
+    <div className="page">
+      <div className="card">
+        <div className="card-header">
+          <div>
+            <div className="card-title">Acceso restringido</div>
+            <div className="card-subtitle">Solo administradores pueden ver el overview de órdenes.</div>
+          </div>
+        </div>
+        <div className="hint muted">
+          Inicia sesión con el usuario <span className="mono">admin</span> o vuelve a la pantalla principal.
+        </div>
+        <div style={{ marginTop: 14 }}>
+          <Link to="/" className="link">Volver a reservar asiento</Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
+  function OrdersGate() {
+    const { roles } = useAuth();
+    const isAdmin = Boolean(Array.isArray(roles) && roles.includes('admin'));
+    return isAdmin ? <OrdersOverview /> : <Unauthorized />;
+  }
   return (
     <AuthProvider>
       <Router>
         <Topbar />
         <Routes>
           <Route path="/" element={<SeatSelection />} />
-          <Route path="/orders" element={<OrdersOverview />} />
+          <Route path="/orders" element={<OrdersGate />} />
         </Routes>
       </Router>
     </AuthProvider>
