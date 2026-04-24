@@ -1,5 +1,0 @@
-resources:
-  - ../../base
-  - rolebinding.yaml
-  - configmap.yaml
-  - route.yaml
