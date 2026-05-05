@@ -68,4 +68,4 @@ See each module’s README for Quarkus packaging options:
 
 ## Deploying to OpenShift
 
-Use the GitOps repository (`demo-camel-saga-gitops`) to install the complete demo (operators, Kafka cluster + topics, Keycloak, Kafka consoles, and the applications) using ArgoCD.
+Use the GitOps repository ([`camel-quarkus-saga-gitops`](https://github.com/panchoraposo/camel-quarkus-saga-gitops)) to install the complete demo (operators, Kafka cluster + topics, Keycloak, Kafka consoles, and the applications) using ArgoCD.
