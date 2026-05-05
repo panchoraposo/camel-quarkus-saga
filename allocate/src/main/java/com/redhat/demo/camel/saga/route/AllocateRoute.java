@@ -32,8 +32,11 @@ public class AllocateRoute extends RouteBuilder {
                         .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
                         .filter().simple("${body.eventType} == 'OrderCreated'")
                         .setHeader("seatId", simple("${body.seatId}"))
+                        .setHeader("userId", simple("${body.userId}"))
+                        .setHeader("price", simple("${body.price}"))
+                        .setHeader("budgetReserved", simple("${body.budgetReserved}"))
+                        .setHeader("forceFailPayment", simple("${body.forceFailPayment}"))
                         .log("DEBUG - Received Kafka message: ${body}")
-                        .setBody(simple("${body}"))
                         .setHeader("seatId", simple("${body.seatId}"))
                         .setHeader("orderId", simple("${body.orderId}"))
                         .to("direct:allocateSeat");
@@ -74,6 +77,18 @@ public class AllocateRoute extends RouteBuilder {
                                 }
                                 if (order.getOrderId() == null) {
                                         order.setOrderId(exchange.getIn().getHeader("orderId", String.class));
+                                }
+                                if (order.getUserId() == null) {
+                                        order.setUserId(exchange.getIn().getHeader("userId", Long.class));
+                                }
+                                if (order.getPrice() == null) {
+                                        order.setPrice(exchange.getIn().getHeader("price", Double.class));
+                                }
+                                if (order.getBudgetReserved() == null) {
+                                        order.setBudgetReserved(exchange.getIn().getHeader("budgetReserved", Boolean.class));
+                                }
+                                if (order.getForceFailPayment() == null) {
+                                        order.setForceFailPayment(exchange.getIn().getHeader("forceFailPayment", Boolean.class));
                                 }
                                 if (order.getSagaId() == null) {
                                         order.setSagaId(order.getOrderId());
