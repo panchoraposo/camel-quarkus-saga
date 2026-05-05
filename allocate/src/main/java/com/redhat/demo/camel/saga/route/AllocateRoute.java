@@ -32,10 +32,12 @@ public class AllocateRoute extends RouteBuilder {
                         .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
                         .filter().simple("${body.eventType} == 'OrderCreated'")
                         .setHeader("seatId", simple("${body.seatId}"))
-                        .setHeader("userId", simple("${body.userId}"))
-                        .setHeader("price", simple("${body.price}"))
-                        .setHeader("budgetReserved", simple("${body.budgetReserved}"))
-                        .setHeader("forceFailPayment", simple("${body.forceFailPayment}"))
+                        // Preserve important fields on the Exchange itself.
+                        // Kafka headers can arrive as byte[] and cause type conversion issues in failure paths.
+                        .setProperty("tb.userId", simple("${body.userId}"))
+                        .setProperty("tb.price", simple("${body.price}"))
+                        .setProperty("tb.budgetReserved", simple("${body.budgetReserved}"))
+                        .setProperty("tb.forceFailPayment", simple("${body.forceFailPayment}"))
                         .log("DEBUG - Received Kafka message: ${body}")
                         .setHeader("seatId", simple("${body.seatId}"))
                         .setHeader("orderId", simple("${body.orderId}"))
@@ -79,16 +81,16 @@ public class AllocateRoute extends RouteBuilder {
                                         order.setOrderId(exchange.getIn().getHeader("orderId", String.class));
                                 }
                                 if (order.getUserId() == null) {
-                                        order.setUserId(exchange.getIn().getHeader("userId", Long.class));
+                                        order.setUserId(exchange.getProperty("tb.userId", Long.class));
                                 }
                                 if (order.getPrice() == null) {
-                                        order.setPrice(exchange.getIn().getHeader("price", Double.class));
+                                        order.setPrice(exchange.getProperty("tb.price", Double.class));
                                 }
                                 if (order.getBudgetReserved() == null) {
-                                        order.setBudgetReserved(exchange.getIn().getHeader("budgetReserved", Boolean.class));
+                                        order.setBudgetReserved(exchange.getProperty("tb.budgetReserved", Boolean.class));
                                 }
                                 if (order.getForceFailPayment() == null) {
-                                        order.setForceFailPayment(exchange.getIn().getHeader("forceFailPayment", Boolean.class));
+                                        order.setForceFailPayment(exchange.getProperty("tb.forceFailPayment", Boolean.class));
                                 }
                                 if (order.getSagaId() == null) {
                                         order.setSagaId(order.getOrderId());
