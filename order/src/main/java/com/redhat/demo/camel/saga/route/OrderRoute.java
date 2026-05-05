@@ -85,8 +85,13 @@ public class OrderRoute extends RouteBuilder {
                                 .otherwise()
                                         .process(exchange -> {
                                                 OrderDto order = exchange.getIn().getBody(OrderDto.class);
-                                                order.setEventType("OrderCreated");
-                                                order.setSagaId(order.getOrderId());
+                                                // Keep a structured response body for the REST caller.
+                                                exchange.setProperty("orderResponse", order);
+
+                                                if (order != null) {
+                                                        order.setEventType("OrderCreated");
+                                                        order.setSagaId(order.getOrderId());
+                                                }
                                                 ObjectMapper objectMapper = new ObjectMapper();
                                                 String json = objectMapper.writeValueAsString(order);
                                                 exchange.getIn().setBody(json);
@@ -95,6 +100,14 @@ public class OrderRoute extends RouteBuilder {
                                         .log("Sending OrderCreated event to Kafka: ${body}")
                                         .to("kafka:order-events")
                                         .log("OrderCreated sent to Kafka topic: order-events.")
+                                        .process(exchange -> {
+                                                OrderDto order = exchange.getProperty("orderResponse", OrderDto.class);
+                                                if (order != null) {
+                                                        // Avoid leaking internal event metadata to REST clients.
+                                                        order.setEventType(null);
+                                                }
+                                                exchange.getIn().setBody(order);
+                                        })
                         .end();
                 
                 from("direct:insertOrder")
