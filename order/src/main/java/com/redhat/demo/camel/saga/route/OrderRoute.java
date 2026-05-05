@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.apache.camel.LoggingLevel;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.kafka.KafkaConstants;
+import org.apache.camel.Exchange;
 import org.apache.camel.model.dataformat.JsonLibrary;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,6 +28,28 @@ public class OrderRoute extends RouteBuilder {
 
         @Override
         public void configure() throws Exception {
+
+                onException(Exception.class)
+                        .handled(true)
+                        .log(LoggingLevel.ERROR, "Order request failed: ${exception.message}")
+                        .process(exchange -> {
+                                OrderDto order = exchange.getMessage().getBody(OrderDto.class);
+                                if (order == null) {
+                                        order = new OrderDto();
+                                }
+                                if (order.getOrderId() == null) {
+                                        order.setOrderId(exchange.getMessage().getHeader("id", String.class));
+                                }
+                                if (order.getSagaId() == null) {
+                                        order.setSagaId(order.getOrderId());
+                                }
+                                order.setOrderStatus("FAILED");
+                                if (order.getOrderMessage() == null || order.getOrderMessage().isBlank()) {
+                                        order.setOrderMessage("Order processing failed.");
+                                }
+                                exchange.getMessage().setHeader(Exchange.HTTP_RESPONSE_CODE, 200);
+                                exchange.getMessage().setBody(order);
+                        });
 
                 // Endpoint REST para crear un pedido
                 from("rest:post:/order")
@@ -75,11 +98,15 @@ public class OrderRoute extends RouteBuilder {
                         .end();
                 
                 from("direct:insertOrder")
-                        .setHeader("orderId", simple("${body.orderId}"))
-                        .setHeader("seatId", simple("${body.seatId}"))
-                        .setHeader("orderStatus", simple("${body.orderStatus}"))
-                        .setHeader("userId", simple("${body.userId}"))
-                        .setHeader("orderMessage", simple("${body.orderMessage}"))
+                        .process(exchange -> {
+                                OrderDto order = exchange.getMessage().getBody(OrderDto.class);
+                                // setHeader(null) would remove headers; keep explicit keys (null values allowed)
+                                exchange.getMessage().getHeaders().put("orderId", order != null ? order.getOrderId() : null);
+                                exchange.getMessage().getHeaders().put("seatId", order != null ? order.getSeatId() : null);
+                                exchange.getMessage().getHeaders().put("orderStatus", order != null ? order.getOrderStatus() : null);
+                                exchange.getMessage().getHeaders().put("userId", order != null ? order.getUserId() : null);
+                                exchange.getMessage().getHeaders().put("orderMessage", order != null ? order.getOrderMessage() : null);
+                        })
                         .log("Headers: orderId=${header.orderId}, userId=${header.userId}, seatId=${header.seatId}, orderStatus=${header.orderStatus}, orderMessage=${header.orderMessage}")
                         .log("SQL: {{sql.insertOrder}}")
                         .to("sql:{{sql.insertOrder}}")
