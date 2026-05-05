@@ -7,8 +7,10 @@ import org.apache.camel.component.kafka.KafkaConstants;
 import org.apache.camel.model.dataformat.JsonLibrary;
 
 import com.redhat.demo.camel.saga.model.OrderDto;
+import com.redhat.demo.camel.saga.observability.TbTelemetry;
 import com.redhat.demo.camel.saga.service.AllocateService;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -18,8 +20,13 @@ public class AllocateRoute extends RouteBuilder {
         @Inject
         AllocateService allocateService;
 
+        @Inject
+        MeterRegistry meterRegistry;
+
         @Override
         public void configure() throws Exception {
+
+                onCompletion().process(TbTelemetry::endSpanAndClearMdc);
 
                 onException(Exception.class)
                         .log("Exception occurred: ${exception.message}")
@@ -29,8 +36,10 @@ public class AllocateRoute extends RouteBuilder {
 
                 // Consumir eventos de ordenes
                 from("kafka:order-events")
+                        .process(exchange -> TbTelemetry.startKafkaConsumerSpan(exchange, "kafka.consume order-events"))
                         .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
                         .filter().simple("${body.eventType} == 'OrderCreated'")
+                        .process(exchange -> meterRegistry.counter("ticketblaster_kafka_events_consumed_total", "topic", "order-events", "eventType", "OrderCreated").increment())
                         .setHeader("seatId", simple("${body.seatId}"))
                         // Preserve important fields on the Exchange itself.
                         // Kafka headers can arrive as byte[] and cause type conversion issues in failure paths.
@@ -62,6 +71,7 @@ public class AllocateRoute extends RouteBuilder {
                         // Producir evento a Kafka
                         .marshal().json(JsonLibrary.Jackson)
                         .setHeader(KafkaConstants.KEY, simple("${header.orderId}"))
+                        .process(TbTelemetry::injectTraceContextIntoHeaders)
                         .log("Sending allocation event to Kafka: ${body}")
                         .to("kafka:seat-events")
                         .log("Seat allocation sent to Kafka topic: seat-events");
@@ -106,6 +116,7 @@ public class AllocateRoute extends RouteBuilder {
                         })
                         .marshal().json(JsonLibrary.Jackson)
                         .setHeader(KafkaConstants.KEY, simple("${header.orderId}"))
+                        .process(TbTelemetry::injectTraceContextIntoHeaders)
                         .to("kafka:seat-events");
                 
                 // Update seat
@@ -143,8 +154,10 @@ public class AllocateRoute extends RouteBuilder {
 
                 // Compensation triggered by downstream services (e.g. payment failed) -> release seat
                 from("kafka:compensation-events")
+                        .process(exchange -> TbTelemetry.startKafkaConsumerSpan(exchange, "kafka.consume compensation-events"))
                         .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
                         .filter().simple("${body.eventType} == 'CompensateSeat'")
+                        .process(exchange -> meterRegistry.counter("ticketblaster_kafka_events_consumed_total", "topic", "compensation-events", "eventType", "CompensateSeat").increment())
                         .log("Downstream compensation received, releasing seat. Event: ${body}")
                         .setHeader("seatId", simple("${body.seatId}"))
                         .setHeader("orderId", simple("${body.orderId}"))
@@ -161,6 +174,7 @@ public class AllocateRoute extends RouteBuilder {
                         .to("direct:updateSeat")
                         .marshal().json(JsonLibrary.Jackson)
                         .setHeader(KafkaConstants.KEY, simple("${header.orderId}"))
+                        .process(TbTelemetry::injectTraceContextIntoHeaders)
                         .log("Publishing SeatReleased to seat-events: ${body}")
                         .to("kafka:seat-events");
 

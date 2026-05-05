@@ -11,9 +11,11 @@ import org.apache.camel.model.dataformat.JsonLibrary;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.redhat.demo.camel.saga.model.OrderDto;
+import com.redhat.demo.camel.saga.observability.TbTelemetry;
 import com.redhat.demo.camel.saga.repository.OrderRepository;
 import com.redhat.demo.camel.saga.service.OrderService;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -26,8 +28,13 @@ public class OrderRoute extends RouteBuilder {
         @Inject
         OrderRepository orderRepository;
 
+        @Inject
+        MeterRegistry meterRegistry;
+
         @Override
         public void configure() throws Exception {
+
+                onCompletion().process(TbTelemetry::endSpanAndClearMdc);
 
                 onException(Exception.class)
                         .handled(true)
@@ -53,6 +60,7 @@ public class OrderRoute extends RouteBuilder {
 
                 // Endpoint REST para crear un pedido
                 from("rest:post:/order")
+                        .process(TbTelemetry::putMdcFromCurrentSpan)
                         .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
                         .process(exchange -> {
                                 exchange.getMessage().setHeader("id", UUID.randomUUID().toString());
@@ -68,6 +76,11 @@ public class OrderRoute extends RouteBuilder {
                         })
                         .log(LoggingLevel.INFO, "Order received: ${header.orderJson}")
                         .to("direct:newOrder")
+                        .process(exchange -> {
+                                OrderDto order = exchange.getMessage().getBody(OrderDto.class);
+                                String status = order != null && order.getOrderStatus() != null ? order.getOrderStatus() : "UNKNOWN";
+                                meterRegistry.counter("ticketblaster_saga_orders_total", "status", status).increment();
+                        })
                         .marshal().json(JsonLibrary.Jackson);
 
                 from("direct:newOrder")
@@ -97,6 +110,7 @@ public class OrderRoute extends RouteBuilder {
                                                 exchange.getIn().setBody(json);
                                         })
                                         .setHeader(KafkaConstants.KEY, simple("${header.id}"))
+                                        .process(TbTelemetry::injectTraceContextIntoHeaders)
                                         .log("Sending OrderCreated event to Kafka: ${body}")
                                         .to("kafka:order-events")
                                         .log("OrderCreated sent to Kafka topic: order-events.")
@@ -127,8 +141,10 @@ public class OrderRoute extends RouteBuilder {
 
                 // Allocation result (seat-events)
                 from("kafka:seat-events")
+                        .process(exchange -> TbTelemetry.startKafkaConsumerSpan(exchange, "kafka.consume seat-events"))
                         .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
                         .filter().simple("${body.eventType} == 'SeatReserveFailed'")
+                        .process(exchange -> meterRegistry.counter("ticketblaster_kafka_events_consumed_total", "topic", "seat-events", "eventType", "SeatReserveFailed").increment())
                         .log("Seat reservation failed: ${body.seatMessage}")
                         .setHeader("orderId", simple("${body.orderId}"))
                         .setHeader("orderStatus", constant("FAILED"))
@@ -145,8 +161,10 @@ public class OrderRoute extends RouteBuilder {
 
                 // Seat release due to compensation (allocate publishes SeatReleased after CompensateSeat)
                 from("kafka:seat-events")
+                        .process(exchange -> TbTelemetry.startKafkaConsumerSpan(exchange, "kafka.consume seat-events"))
                         .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
                         .filter().simple("${body.eventType} == 'SeatReleased'")
+                        .process(exchange -> meterRegistry.counter("ticketblaster_kafka_events_consumed_total", "topic", "seat-events", "eventType", "SeatReleased").increment())
                         .log("Seat released after compensation: ${body.seatMessage}")
                         .setHeader("orderId", simple("${body.orderId}"))
                         .setHeader("seatStatus", simple("${body.seatStatus}"))
@@ -155,6 +173,7 @@ public class OrderRoute extends RouteBuilder {
                         .to("sql:{{sql.updateOrderSeat}}");
 
                 from("kafka:payment-events")
+                        .process(exchange -> TbTelemetry.startKafkaConsumerSpan(exchange, "kafka.consume payment-events"))
                         .log("Raw Payment event from Kafka: ${body}")
                         .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
                         .log("Parsed OrderDto: ${body}")
@@ -188,6 +207,7 @@ public class OrderRoute extends RouteBuilder {
                                         .setProperty("orderObj", body())
                                         .marshal().json(JsonLibrary.Jackson)
                                         .setHeader(KafkaConstants.KEY, simple("${header.orderId}"))
+                                        .process(TbTelemetry::injectTraceContextIntoHeaders)
                                         .to("kafka:compensation-events")
                                         .setBody(exchangeProperty("orderObj"))
                         .end()

@@ -5,9 +5,11 @@ import org.apache.camel.component.kafka.KafkaConstants;
 import org.apache.camel.model.dataformat.JsonLibrary;
 
 import com.redhat.demo.camel.saga.model.OrderDto;
+import com.redhat.demo.camel.saga.observability.TbTelemetry;
 import com.redhat.demo.camel.saga.service.PaymentService;
 import com.redhat.demo.repository.PaymentRepository;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -20,8 +22,13 @@ public class PaymentRoute extends RouteBuilder {
         @Inject
         PaymentRepository paymentRepository;
 
+        @Inject
+        MeterRegistry meterRegistry;
+
         @Override
         public void configure() throws Exception {
+
+                onCompletion().process(TbTelemetry::endSpanAndClearMdc);
 
                 onException(Exception.class)
                         .log("Exception occurred: ${exception.message}")
@@ -43,16 +50,19 @@ public class PaymentRoute extends RouteBuilder {
                         })
                         .marshal().json(JsonLibrary.Jackson)
                         .setHeader(KafkaConstants.KEY, simple("${body.orderId}"))
+                        .process(TbTelemetry::injectTraceContextIntoHeaders)
                         .to("kafka:payment-events");
 
                 // Escuchar eventos de pedidos
                 from("kafka:seat-events")
+                        .process(exchange -> TbTelemetry.startKafkaConsumerSpan(exchange, "kafka.consume seat-events"))
                         .log("DEBUG - Received Kafka message: ${body}")
                         .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
                         .setHeader("price", simple("${body.price}"))
                         .setHeader("orderId", simple("${body.orderId}"))
                         .setHeader("seatId", simple("${body.seatId}"))
                         .filter().simple("${body.eventType} == 'SeatReserved'")
+                        .process(exchange -> meterRegistry.counter("ticketblaster_kafka_events_consumed_total", "topic", "seat-events", "eventType", "SeatReserved").increment())
                         .to("direct:processPayment");
 
                 // Process payment
@@ -76,6 +86,7 @@ public class PaymentRoute extends RouteBuilder {
                         })
                         .marshal().json()
                         .setHeader(KafkaConstants.KEY, simple("${header.orderId}"))
+                        .process(TbTelemetry::injectTraceContextIntoHeaders)
                         .to("kafka:payment-events") // Publicar evento de pago (éxito o fallo)
                         .log("Sending payment event to Kafka: ${body}")
                         .log("Payment sent to Kafka topic: payment-events");                        
