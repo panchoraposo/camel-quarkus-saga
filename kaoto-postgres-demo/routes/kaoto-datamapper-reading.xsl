@@ -2,7 +2,7 @@
 <xsl:stylesheet version="1.0"
                 xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
 
-  <xsl:output method="text" encoding="UTF-8" omit-xml-declaration="yes"/>
+  <xsl:output method="xml" encoding="UTF-8" omit-xml-declaration="yes" indent="yes"/>
 
   <xsl:template match="/">
     <xsl:variable name="sensorId" select="normalize-space(/reading/sensorId)"/>
@@ -26,12 +26,19 @@
       </xsl:choose>
     </xsl:variable>
 
-    <xsl:text>{</xsl:text>
-    <xsl:text>"sensor":{"id":"</xsl:text><xsl:value-of select="$sensorId"/><xsl:text>","location":"</xsl:text><xsl:value-of select="$location"/><xsl:text>","zone":"</xsl:text><xsl:value-of select="$zone"/><xsl:text>"},</xsl:text>
-    <xsl:text>"metrics":{"tempC":</xsl:text><xsl:value-of select="$tempC"/><xsl:text>,"humidity":</xsl:text><xsl:value-of select="$humidity"/><xsl:text>},</xsl:text>
-    <xsl:text>"severity":"</xsl:text><xsl:value-of select="normalize-space($severity)"/><xsl:text>",</xsl:text>
-    <xsl:text>"unitSystem":"metric"</xsl:text>
-    <xsl:text>}</xsl:text>
+    <canonicalReading>
+      <sensor>
+        <id><xsl:value-of select="$sensorId"/></id>
+        <location><xsl:value-of select="$location"/></location>
+        <zone><xsl:value-of select="$zone"/></zone>
+      </sensor>
+      <metrics>
+        <tempC><xsl:value-of select="$tempC"/></tempC>
+        <humidity><xsl:value-of select="$humidity"/></humidity>
+      </metrics>
+      <severity><xsl:value-of select="normalize-space($severity)"/></severity>
+      <unitSystem>metric</unitSystem>
+    </canonicalReading>
   </xsl:template>
 
 </xsl:stylesheet>

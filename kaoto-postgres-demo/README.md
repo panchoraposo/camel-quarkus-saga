@@ -61,7 +61,7 @@ XML
 2. Click the **Kaoto DataMapper** step (`kaoto-datamapper-reading`) and press **Configure**.
 3. Attach schemas so the DataMapper canvas shows a tree on both sides:
    - **Source → Body**: `routes/schemas/reading.xsd` (root element: `reading`)
-   - **Target → Body**: `routes/schemas/canonical-reading.schema.json`
+   - **Target → Body**: `routes/schemas/canonical-reading.xsd` (root element: `canonicalReading`)
 4. Create mappings by drag-and-drop (for example, `reading/sensorId` → `sensor/id`, etc.).
 5. Re-run the `camel run ...` command to test your changes.
 

@@ -97,6 +97,9 @@
               - to:
                   id: kaoto-datamapper-xslt-reading
                   uri: xslt-saxon:kaoto-datamapper-reading.xsl
+        # Convert canonical XML -> canonical JSON for persistence and HTTP responses
+        - to:
+            uri: xslt-saxon:classpath:canonical-reading-to-json.xsl
         - setHeader:
             name: mappedJson
             simple: "${body}"
