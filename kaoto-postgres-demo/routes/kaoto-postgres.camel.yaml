@@ -38,7 +38,9 @@
         - to:
             uri: direct:process-xml
         - log:
-            message: "JSON out: ${body}"
+            message: |
+              JSON out (pretty):
+              ${body}
 
 - route:
     id: kaoto-postgres-process-xml
@@ -49,6 +51,10 @@
         - setHeader:
             name: sourceXml
             simple: "${body}"
+        - log:
+            message: |
+              XML in:
+              ${header.sourceXml}
 
         # Ensure table/schema exists (idempotent even if an older version exists)
         - to:
@@ -122,4 +128,9 @@
         - marshal:
             json:
               library: Jackson
+              prettyPrint: true
+        - log:
+            message: |
+              JSON out (pretty):
+              ${body}
 
