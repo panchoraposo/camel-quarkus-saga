@@ -69,3 +69,23 @@ See each module’s README for Quarkus packaging options:
 ## Deploying to OpenShift
 
 Use the GitOps repository ([`camel-quarkus-saga-gitops`](https://github.com/panchoraposo/camel-quarkus-saga-gitops)) to install the complete demo (operators, Kafka cluster + topics, Keycloak, Kafka consoles, and the applications) using ArgoCD.
+
+## Observability (logs, traces, metrics)
+
+The backend services (`order`, `allocate`, `payment`) are instrumented for:
+
+- **Structured logs**: JSON console logs with correlation fields (trace/span ids + business ids like `orderId` / `sagaId` when available).
+- **Distributed tracing**: OTLP export to the in-cluster OpenTelemetry Collector (which forwards to Tempo).
+- **Prometheus metrics**: `/q/metrics` exposes Quarkus + custom business metrics via Micrometer.
+
+### PromQL examples
+
+These queries assume you are using OpenShift user-workload monitoring (Prometheus) and that the GitOps repo has installed the `ServiceMonitor`s.
+
+```promql
+# Orders created by status (counter)
+sum by (status) (increase(ticketblaster_saga_orders_total[5m]))
+
+# Kafka events consumed per service/topic/eventType
+sum by (service, topic, eventType) (rate(ticketblaster_kafka_events_consumed_total[5m]))
+```
