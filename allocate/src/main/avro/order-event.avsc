@@ -2,8 +2,9 @@
   "type": "record",
   "name": "OrderEvent",
   "namespace": "com.redhat.demo.camel.saga.avro",
+  "doc": "Kafka saga event envelope used by the Ticketblaster demo (choreography + compensations).",
   "fields": [
-    { "name": "eventType", "type": "string" },
+    { "name": "eventType", "type": "string", "doc": "Logical step identifier (e.g. OrderCreated, PaymentFailed, SeatReleased)." },
     { "name": "sagaId", "type": ["null", "string"], "default": null },
     { "name": "orderId", "type": "string" },
 
