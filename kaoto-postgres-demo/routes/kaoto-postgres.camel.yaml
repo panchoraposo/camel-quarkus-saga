@@ -50,9 +50,29 @@
             name: sourceXml
             simple: "${body}"
 
-        # Create table if needed
+        # Ensure table/schema exists (idempotent even if an older version exists)
         - to:
-            uri: sql:CREATE TABLE IF NOT EXISTS kaoto_demo (id SERIAL PRIMARY KEY, event_type TEXT, user_id BIGINT, seat_id TEXT, price NUMERIC, source_xml TEXT, created_at TIMESTAMP DEFAULT NOW())
+            uri: sql:CREATE TABLE IF NOT EXISTS kaoto_demo (id SERIAL PRIMARY KEY, created_at TIMESTAMP DEFAULT NOW())
+            parameters:
+              dataSource: "#postgresDS"
+        - to:
+            uri: sql:ALTER TABLE kaoto_demo ADD COLUMN IF NOT EXISTS event_type TEXT
+            parameters:
+              dataSource: "#postgresDS"
+        - to:
+            uri: sql:ALTER TABLE kaoto_demo ADD COLUMN IF NOT EXISTS user_id BIGINT
+            parameters:
+              dataSource: "#postgresDS"
+        - to:
+            uri: sql:ALTER TABLE kaoto_demo ADD COLUMN IF NOT EXISTS seat_id TEXT
+            parameters:
+              dataSource: "#postgresDS"
+        - to:
+            uri: sql:ALTER TABLE kaoto_demo ADD COLUMN IF NOT EXISTS price NUMERIC
+            parameters:
+              dataSource: "#postgresDS"
+        - to:
+            uri: sql:ALTER TABLE kaoto_demo ADD COLUMN IF NOT EXISTS source_xml TEXT
             parameters:
               dataSource: "#postgresDS"
 
