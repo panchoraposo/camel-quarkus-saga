@@ -2,8 +2,9 @@ package com.redhat.demo.camel.saga.route;
 
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.kafka.KafkaConstants;
-import org.apache.camel.model.dataformat.JsonLibrary;
 
+import com.redhat.demo.camel.saga.avro.OrderEvent;
+import com.redhat.demo.camel.saga.event.OrderEventMapper;
 import com.redhat.demo.camel.saga.model.OrderDto;
 import com.redhat.demo.camel.saga.observability.TbTelemetry;
 import com.redhat.demo.camel.saga.service.PaymentService;
@@ -48,7 +49,8 @@ public class PaymentRoute extends RouteBuilder {
                                 }
                                 exchange.getIn().setBody(order);
                         })
-                        .marshal().json(JsonLibrary.Jackson)
+                        .process(exchange -> exchange.getIn().setBody(
+                                OrderEventMapper.toEvent(exchange.getIn().getBody(OrderDto.class))))
                         .setHeader(KafkaConstants.KEY, simple("${body.orderId}"))
                         .process(TbTelemetry::injectTraceContextIntoHeaders)
                         .to("kafka:payment-events");
@@ -57,7 +59,8 @@ public class PaymentRoute extends RouteBuilder {
                 from("kafka:seat-events")
                         .process(exchange -> TbTelemetry.startKafkaConsumerSpan(exchange, "kafka.consume seat-events"))
                         .log("DEBUG - Received Kafka message: ${body}")
-                        .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
+                        .process(exchange -> exchange.getMessage().setBody(
+                                OrderEventMapper.toDto(exchange.getMessage().getBody(OrderEvent.class))))
                         .setHeader("price", simple("${body.price}"))
                         .setHeader("orderId", simple("${body.orderId}"))
                         .setHeader("seatId", simple("${body.seatId}"))
@@ -84,7 +87,8 @@ public class PaymentRoute extends RouteBuilder {
                                         }
                                 }
                         })
-                        .marshal().json()
+                        .process(exchange -> exchange.getIn().setBody(
+                                OrderEventMapper.toEvent(exchange.getIn().getBody(OrderDto.class))))
                         .setHeader(KafkaConstants.KEY, simple("${header.orderId}"))
                         .process(TbTelemetry::injectTraceContextIntoHeaders)
                         .to("kafka:payment-events") // Publicar evento de pago (éxito o fallo)

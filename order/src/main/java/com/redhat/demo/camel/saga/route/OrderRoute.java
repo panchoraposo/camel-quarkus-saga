@@ -10,6 +10,8 @@ import org.apache.camel.model.dataformat.JsonLibrary;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.redhat.demo.camel.saga.avro.OrderEvent;
+import com.redhat.demo.camel.saga.event.OrderEventMapper;
 import com.redhat.demo.camel.saga.model.OrderDto;
 import com.redhat.demo.camel.saga.observability.TbTelemetry;
 import com.redhat.demo.camel.saga.repository.OrderRepository;
@@ -105,9 +107,7 @@ public class OrderRoute extends RouteBuilder {
                                                         order.setEventType("OrderCreated");
                                                         order.setSagaId(order.getOrderId());
                                                 }
-                                                ObjectMapper objectMapper = new ObjectMapper();
-                                                String json = objectMapper.writeValueAsString(order);
-                                                exchange.getIn().setBody(json);
+                                                exchange.getIn().setBody(OrderEventMapper.toEvent(order));
                                         })
                                         .setHeader(KafkaConstants.KEY, simple("${header.id}"))
                                         .process(TbTelemetry::injectTraceContextIntoHeaders)
@@ -142,7 +142,8 @@ public class OrderRoute extends RouteBuilder {
                 // Allocation result (seat-events)
                 from("kafka:seat-events")
                         .process(exchange -> TbTelemetry.startKafkaConsumerSpan(exchange, "kafka.consume seat-events"))
-                        .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
+                        .process(exchange -> exchange.getMessage().setBody(
+                                OrderEventMapper.toDto(exchange.getMessage().getBody(OrderEvent.class))))
                         .filter().simple("${body.eventType} == 'SeatReserveFailed'")
                         .process(exchange -> meterRegistry.counter("ticketblaster_kafka_events_consumed_total", "topic", "seat-events", "eventType", "SeatReserveFailed").increment())
                         .log("Seat reservation failed: ${body.seatMessage}")
@@ -162,7 +163,8 @@ public class OrderRoute extends RouteBuilder {
                 // Seat release due to compensation (allocate publishes SeatReleased after CompensateSeat)
                 from("kafka:seat-events")
                         .process(exchange -> TbTelemetry.startKafkaConsumerSpan(exchange, "kafka.consume seat-events"))
-                        .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
+                        .process(exchange -> exchange.getMessage().setBody(
+                                OrderEventMapper.toDto(exchange.getMessage().getBody(OrderEvent.class))))
                         .filter().simple("${body.eventType} == 'SeatReleased'")
                         .process(exchange -> meterRegistry.counter("ticketblaster_kafka_events_consumed_total", "topic", "seat-events", "eventType", "SeatReleased").increment())
                         .log("Seat released after compensation: ${body.seatMessage}")
@@ -175,8 +177,8 @@ public class OrderRoute extends RouteBuilder {
                 from("kafka:payment-events")
                         .process(exchange -> TbTelemetry.startKafkaConsumerSpan(exchange, "kafka.consume payment-events"))
                         .log("Raw Payment event from Kafka: ${body}")
-                        .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
-                        .log("Parsed OrderDto: ${body}")
+                        .process(exchange -> exchange.getMessage().setBody(
+                                OrderEventMapper.toDto(exchange.getMessage().getBody(OrderEvent.class))))
                         .log("Payment eventType=${body.eventType} paymentStatus=${body.paymentStatus}")
                         .setHeader("orderId", simple("${body.orderId}"))
                         .choice()
@@ -205,7 +207,8 @@ public class OrderRoute extends RouteBuilder {
                                                 }
                                         })
                                         .setProperty("orderObj", body())
-                                        .marshal().json(JsonLibrary.Jackson)
+                                        .process(exchange -> exchange.getIn().setBody(
+                                                OrderEventMapper.toEvent(exchange.getIn().getBody(OrderDto.class))))
                                         .setHeader(KafkaConstants.KEY, simple("${header.orderId}"))
                                         .process(TbTelemetry::injectTraceContextIntoHeaders)
                                         .to("kafka:compensation-events")

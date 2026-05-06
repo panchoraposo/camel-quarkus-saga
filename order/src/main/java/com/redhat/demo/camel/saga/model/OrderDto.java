@@ -42,14 +42,6 @@ public class OrderDto {
         return orderId;
     }
 
-    public String getPaymentId() {
-        return paymentId;
-    }
-
-    public void setPaymentId(String paymentId) {
-        this.paymentId = paymentId;
-    }
-
     public void setOrderId(String orderId) {
         this.orderId = orderId;
     }
@@ -62,20 +54,20 @@ public class OrderDto {
         this.seatId = seatId;
     }
 
-    public Long getDate() {
-        return date;
-    }
-
-    public void setDate(Long date) {
-        this.date = date;
-    }
-
     public Long getUserId() {
         return userId;
     }
 
     public void setUserId(Long userId) {
         this.userId = userId;
+    }
+
+    public Long getDate() {
+        return date;
+    }
+
+    public void setDate(Long date) {
+        this.date = date;
     }
 
     public Double getPrice() {
@@ -94,28 +86,28 @@ public class OrderDto {
         this.orderStatus = orderStatus;
     }
 
-    public String getPaymentStatus() {
-        return paymentStatus;
-    }
-
-    public void setPaymentStatus(String paymentStatus) {
-        this.paymentStatus = paymentStatus;
-    }
-
-    public String getSeatStatus() {
-        return seatStatus;
-    }
-
-    public void setSeatStatus(String seatStatus) {
-        this.seatStatus = seatStatus;
-    }
-
     public String getOrderMessage() {
         return orderMessage;
     }
 
     public void setOrderMessage(String orderMessage) {
         this.orderMessage = orderMessage;
+    }
+
+    public String getPaymentId() {
+        return paymentId;
+    }
+
+    public void setPaymentId(String paymentId) {
+        this.paymentId = paymentId;
+    }
+
+    public String getPaymentStatus() {
+        return paymentStatus;
+    }
+
+    public void setPaymentStatus(String paymentStatus) {
+        this.paymentStatus = paymentStatus;
     }
 
     public String getPaymentMessage() {
@@ -126,12 +118,20 @@ public class OrderDto {
         this.paymentMessage = paymentMessage;
     }
 
-    public String getSeatMessage() {
-        return seatMessage;
+    public String getSeatStatus() {
+        return seatStatus;
+    }
+
+    public void setSeatStatus(String seatStatus) {
+        this.seatStatus = seatStatus;
     }
 
     public void setSeatMessage(String seatMessage) {
         this.seatMessage = seatMessage;
+    }
+
+    public String getSeatMessage() {
+        return seatMessage;
     }
 
     public Boolean getBudgetReserved() {

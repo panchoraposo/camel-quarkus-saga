@@ -4,8 +4,9 @@ import java.util.List;
 
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.kafka.KafkaConstants;
-import org.apache.camel.model.dataformat.JsonLibrary;
 
+import com.redhat.demo.camel.saga.avro.OrderEvent;
+import com.redhat.demo.camel.saga.event.OrderEventMapper;
 import com.redhat.demo.camel.saga.model.OrderDto;
 import com.redhat.demo.camel.saga.observability.TbTelemetry;
 import com.redhat.demo.camel.saga.service.AllocateService;
@@ -37,7 +38,8 @@ public class AllocateRoute extends RouteBuilder {
                 // Consumir eventos de ordenes
                 from("kafka:order-events")
                         .process(exchange -> TbTelemetry.startKafkaConsumerSpan(exchange, "kafka.consume order-events"))
-                        .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
+                        .process(exchange -> exchange.getMessage().setBody(
+                                OrderEventMapper.toDto(exchange.getMessage().getBody(OrderEvent.class))))
                         .filter().simple("${body.eventType} == 'OrderCreated'")
                         .process(exchange -> meterRegistry.counter("ticketblaster_kafka_events_consumed_total", "topic", "order-events", "eventType", "OrderCreated").increment())
                         .setHeader("seatId", simple("${body.seatId}"))
@@ -69,7 +71,8 @@ public class AllocateRoute extends RouteBuilder {
                         .log("Updating seat in database: ${body}")
                         .to("direct:updateSeat")
                         // Producir evento a Kafka
-                        .marshal().json(JsonLibrary.Jackson)
+                        .process(exchange -> exchange.getIn().setBody(
+                                OrderEventMapper.toEvent(exchange.getIn().getBody(OrderDto.class))))
                         .setHeader(KafkaConstants.KEY, simple("${header.orderId}"))
                         .process(TbTelemetry::injectTraceContextIntoHeaders)
                         .log("Sending allocation event to Kafka: ${body}")
@@ -114,7 +117,8 @@ public class AllocateRoute extends RouteBuilder {
                                 }
                                 exchange.getIn().setBody(order);
                         })
-                        .marshal().json(JsonLibrary.Jackson)
+                        .process(exchange -> exchange.getIn().setBody(
+                                OrderEventMapper.toEvent(exchange.getIn().getBody(OrderDto.class))))
                         .setHeader(KafkaConstants.KEY, simple("${header.orderId}"))
                         .process(TbTelemetry::injectTraceContextIntoHeaders)
                         .to("kafka:seat-events");
@@ -155,7 +159,8 @@ public class AllocateRoute extends RouteBuilder {
                 // Compensation triggered by downstream services (e.g. payment failed) -> release seat
                 from("kafka:compensation-events")
                         .process(exchange -> TbTelemetry.startKafkaConsumerSpan(exchange, "kafka.consume compensation-events"))
-                        .unmarshal().json(JsonLibrary.Jackson, OrderDto.class)
+                        .process(exchange -> exchange.getMessage().setBody(
+                                OrderEventMapper.toDto(exchange.getMessage().getBody(OrderEvent.class))))
                         .filter().simple("${body.eventType} == 'CompensateSeat'")
                         .process(exchange -> meterRegistry.counter("ticketblaster_kafka_events_consumed_total", "topic", "compensation-events", "eventType", "CompensateSeat").increment())
                         .log("Downstream compensation received, releasing seat. Event: ${body}")
@@ -172,7 +177,8 @@ public class AllocateRoute extends RouteBuilder {
                                 }
                         })
                         .to("direct:updateSeat")
-                        .marshal().json(JsonLibrary.Jackson)
+                        .process(exchange -> exchange.getIn().setBody(
+                                OrderEventMapper.toEvent(exchange.getIn().getBody(OrderDto.class))))
                         .setHeader(KafkaConstants.KEY, simple("${header.orderId}"))
                         .process(TbTelemetry::injectTraceContextIntoHeaders)
                         .log("Publishing SeatReleased to seat-events: ${body}")
