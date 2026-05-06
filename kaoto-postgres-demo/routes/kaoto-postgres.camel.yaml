@@ -114,7 +114,7 @@
 
         # Insert into Postgres (requires camel-sql)
         - to:
-            uri: sql:INSERT INTO kaoto_readings (sensor_id, location, temp_c, humidity, source_xml, mapped_json) VALUES (:#sensorId, :#location, :#tempC, :#humidity, :#sourceXml, :#mappedJson)
+            uri: sql:INSERT INTO kaoto_readings (sensor_id, location, temp_c, humidity, source_xml, mapped_json) VALUES (:#sensorId, :#location, CAST(:#tempC AS NUMERIC), CAST(:#humidity AS NUMERIC), :#sourceXml, :#mappedJson)
             parameters:
               dataSource: "#postgresDS"
 
