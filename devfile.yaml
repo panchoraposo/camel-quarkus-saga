@@ -1,0 +1,84 @@
+schemaVersion: 2.2.2
+metadata:
+  name: camel-quarkus-saga
+  displayName: TicketBlaster Live (Kaoto + Camel JBang)
+  description: DevSpaces workspace preconfigured for Kaoto + Camel JBang route testing.
+  tags:
+    - kaoto
+    - camel
+    - jbang
+    - postgres
+  projectType: kubernetes
+
+components:
+  - name: tools
+    container:
+      image: quay.io/devfile/universal-developer-image:latest
+      cpuLimit: "2"
+      memoryLimit: 4Gi
+      cpuRequest: "500m"
+      memoryRequest: 1Gi
+      mountSources: true
+      env:
+        - name: JAVA_HOME
+          value: /usr/lib/jvm/java-17
+        # DB defaults for kaoto-postgres-demo/
+        - name: KAOTO_DB_USER
+          value: kaoto
+        - name: KAOTO_DB_PASSWORD
+          value: kaoto
+
+commands:
+  - id: 01-install-jbang
+    exec:
+      component: tools
+      workingDir: ${PROJECT_SOURCE}
+      commandLine: |
+        set -euo pipefail
+
+        if command -v jbang >/dev/null 2>&1; then
+          echo "JBang already installed: $(jbang --version)"
+          exit 0
+        fi
+
+        echo "Installing JBang..."
+        curl -Ls https://sh.jbang.dev | bash -s - app setup
+        echo 'export PATH="$HOME/.jbang/bin:$PATH"' >> "$HOME/.bashrc"
+        export PATH="$HOME/.jbang/bin:$PATH"
+        jbang --version
+
+  - id: 02-install-camel-cli
+    exec:
+      component: tools
+      workingDir: ${PROJECT_SOURCE}
+      commandLine: |
+        set -euo pipefail
+        export PATH="$HOME/.jbang/bin:$PATH"
+
+        if command -v camel >/dev/null 2>&1; then
+          echo "Camel CLI already installed: $(camel --version)"
+          exit 0
+        fi
+
+        echo "Installing Camel JBang CLI..."
+        jbang app install camel@apache/camel
+        camel --version
+
+  - id: 03-run-kaoto-postgres-demo
+    exec:
+      component: tools
+      workingDir: ${PROJECT_SOURCE}/kaoto-postgres-demo
+      commandLine: |
+        set -euo pipefail
+        export PATH="$HOME/.jbang/bin:$PATH"
+
+        camel run routes/kaoto-postgres.camel.yaml \
+          --properties=application.properties \
+          --dep org.postgresql:postgresql:42.7.3 \
+          --dep org.apache.camel:camel-sql
+
+events:
+  postStart:
+    - 01-install-jbang
+    - 02-install-camel-cli
+
