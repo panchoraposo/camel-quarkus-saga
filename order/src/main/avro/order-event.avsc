@@ -1,0 +1,28 @@
+{
+  "type": "record",
+  "name": "OrderEvent",
+  "namespace": "com.redhat.demo.camel.saga.avro",
+  "fields": [
+    { "name": "eventType", "type": "string" },
+    { "name": "sagaId", "type": ["null", "string"], "default": null },
+    { "name": "orderId", "type": "string" },
+
+    { "name": "userId", "type": ["null", "long"], "default": null },
+    { "name": "seatId", "type": ["null", "string"], "default": null },
+    { "name": "price", "type": ["null", "double"], "default": null },
+    { "name": "date", "type": ["null", "long"], "default": null },
+
+    { "name": "orderStatus", "type": ["null", "string"], "default": null },
+    { "name": "orderMessage", "type": ["null", "string"], "default": null },
+
+    { "name": "seatStatus", "type": ["null", "string"], "default": null },
+    { "name": "seatMessage", "type": ["null", "string"], "default": null },
+
+    { "name": "paymentId", "type": ["null", "string"], "default": null },
+    { "name": "paymentStatus", "type": ["null", "string"], "default": null },
+    { "name": "paymentMessage", "type": ["null", "string"], "default": null },
+
+    { "name": "budgetReserved", "type": ["null", "boolean"], "default": null },
+    { "name": "forceFailPayment", "type": ["null", "boolean"], "default": null }
+  ]
+}
