@@ -29,12 +29,12 @@
       steps:
         - setBody:
             simple: |
-              <order>
-                <eventType>OrderCreated</eventType>
-                <userId>123</userId>
-                <seatId>A-1</seatId>
-                <price>50.0</price>
-              </order>
+              <reading>
+                <sensorId>S-100</sensorId>
+                <location>lab</location>
+                <tempC>23.7</tempC>
+                <humidity>45.2</humidity>
+              </reading>
         - to:
             uri: direct:process-xml
         - log:
@@ -56,73 +56,43 @@
               XML in:
               ${header.sourceXml}
 
-        # Ensure table/schema exists (idempotent even if an older version exists)
+        # Keep the demo visually simple: use a dedicated table so we don't need ALTER chains.
         - to:
-            uri: sql:CREATE TABLE IF NOT EXISTS kaoto_demo (id SERIAL PRIMARY KEY, created_at TIMESTAMP DEFAULT NOW())
-            parameters:
-              dataSource: "#postgresDS"
-        - to:
-            uri: sql:ALTER TABLE kaoto_demo ADD COLUMN IF NOT EXISTS event_type TEXT
-            parameters:
-              dataSource: "#postgresDS"
-        - to:
-            uri: sql:ALTER TABLE kaoto_demo ADD COLUMN IF NOT EXISTS user_id BIGINT
-            parameters:
-              dataSource: "#postgresDS"
-        - to:
-            uri: sql:ALTER TABLE kaoto_demo ADD COLUMN IF NOT EXISTS seat_id TEXT
-            parameters:
-              dataSource: "#postgresDS"
-        - to:
-            uri: sql:ALTER TABLE kaoto_demo ADD COLUMN IF NOT EXISTS price NUMERIC
-            parameters:
-              dataSource: "#postgresDS"
-        - to:
-            uri: sql:ALTER TABLE kaoto_demo ADD COLUMN IF NOT EXISTS source_xml TEXT
+            uri: sql:CREATE TABLE IF NOT EXISTS kaoto_readings (id SERIAL PRIMARY KEY, sensor_id TEXT NOT NULL, location TEXT, temp_c NUMERIC, humidity NUMERIC, source_xml TEXT, created_at TIMESTAMP DEFAULT NOW())
             parameters:
               dataSource: "#postgresDS"
 
         # Extract fields from XML using XPath (requires camel-xpath)
         - setHeader:
-            name: eventType
+            name: sensorId
             xpath:
-              expression: /order/eventType/text()
+              expression: /reading/sensorId/text()
               resultType: java.lang.String
         - setHeader:
-            name: userId
+            name: location
             xpath:
-              expression: /order/userId/text()
-              resultType: java.lang.Long
-        - setHeader:
-            name: seatId
-            xpath:
-              expression: /order/seatId/text()
+              expression: /reading/location/text()
               resultType: java.lang.String
         - setHeader:
-            name: price
+            name: tempC
             xpath:
-              expression: /order/price/text()
+              expression: /reading/tempC/text()
               resultType: java.math.BigDecimal
-
-        # Backward-compatible legacy column used by the initial demo version.
-        # Some environments already have kaoto_demo(msg TEXT NOT NULL), so we always populate it.
-        - to:
-            uri: sql:ALTER TABLE kaoto_demo ADD COLUMN IF NOT EXISTS msg TEXT NOT NULL DEFAULT 'xml-demo'
-            parameters:
-              dataSource: "#postgresDS"
         - setHeader:
-            name: msg
-            simple: "eventType=${header.eventType}, userId=${header.userId}, seatId=${header.seatId}, price=${header.price}"
+            name: humidity
+            xpath:
+              expression: /reading/humidity/text()
+              resultType: java.math.BigDecimal
 
         # Insert into Postgres (requires camel-sql)
         - to:
-            uri: sql:INSERT INTO kaoto_demo (msg, event_type, user_id, seat_id, price, source_xml) VALUES (:#msg, :#eventType, :#userId, :#seatId, :#price, :#sourceXml)
+            uri: sql:INSERT INTO kaoto_readings (sensor_id, location, temp_c, humidity, source_xml) VALUES (:#sensorId, :#location, :#tempC, :#humidity, :#sourceXml)
             parameters:
               dataSource: "#postgresDS"
 
         # Read back latest rows and output JSON (requires camel-jackson)
         - to:
-            uri: sql:SELECT id, event_type, user_id, seat_id, price, created_at FROM kaoto_demo ORDER BY id DESC LIMIT 5
+            uri: sql:SELECT id, sensor_id, location, temp_c, humidity, created_at FROM kaoto_readings ORDER BY id DESC LIMIT 5
             parameters:
               dataSource: "#postgresDS"
         - marshal:

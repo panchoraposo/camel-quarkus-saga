@@ -45,12 +45,12 @@ The route also exposes an HTTP endpoint that accepts an XML payload and returns 
 curl -sS -X POST http://localhost:8080/kaoto/demo \
   -H 'Content-Type: application/xml' \
   --data-binary @- <<'XML'
-<order>
-  <eventType>OrderCreated</eventType>
-  <userId>999</userId>
-  <seatId>B-2</seatId>
-  <price>42.5</price>
-</order>
+<reading>
+  <sensorId>S-200</sensorId>
+  <location>office</location>
+  <tempC>22.1</tempC>
+  <humidity>40.0</humidity>
+</reading>
 XML
 ```
 
