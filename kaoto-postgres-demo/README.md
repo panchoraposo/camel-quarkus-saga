@@ -16,7 +16,7 @@ This small demo shows how to use **Kaoto** to edit a **Camel YAML** route that w
 From a DevSpaces terminal (workspace repo root):
 
 ```bash
-cd kaoto-postgres-demo
+cd kaoto-postgres-demo/routes
 
 # If you don't have the `camel` CLI yet:
 jbang app install camel@apache/camel
@@ -26,8 +26,8 @@ export KAOTO_DB_USER=kaoto
 export KAOTO_DB_PASSWORD=kaoto
 
 # Run the route
-camel run routes/kaoto-postgres.camel.yaml \
-  --properties=application.properties \
+camel run kaoto-postgres.camel.yaml \
+  --properties=../application.properties \
   --dep org.postgresql:postgresql:42.7.3 \
   --dep org.apache.camel:camel-sql \
   --dep org.apache.camel:camel-xpath \

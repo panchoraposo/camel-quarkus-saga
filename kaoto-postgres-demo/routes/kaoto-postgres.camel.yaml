@@ -88,10 +88,15 @@
               expression: /reading/humidity/text()
               resultType: java.math.BigDecimal
 
-        # Data mapping / canonical model
-        # Keep it as a single visual step: XSLT transforms the XML body into a canonical JSON document.
-        - to:
-            uri: xslt-saxon:classpath:mappings/reading-to-canonical-json.xsl
+        # Data mapping / canonical model (Kaoto DataMapper)
+        # This wrapper step is what Kaoto recognizes as a DataMapper step.
+        # Kaoto will (re)generate the XSLT below when you use the DataMapper UI.
+        - step:
+            id: kaoto-datamapper-reading
+            steps:
+              - to:
+                  id: kaoto-datamapper-xslt-reading
+                  uri: xslt-saxon:kaoto-datamapper-reading.xsl
         - setHeader:
             name: mappedJson
             simple: "${body}"

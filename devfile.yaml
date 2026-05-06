@@ -93,7 +93,7 @@ commands:
   - id: 03-run-kaoto-postgres-demo
     exec:
       component: tools
-      workingDir: ${PROJECT_SOURCE}/kaoto-postgres-demo
+      workingDir: ${PROJECT_SOURCE}/kaoto-postgres-demo/routes
       commandLine: |
         set -eu
 
@@ -103,8 +103,8 @@ commands:
           exit 1
         fi
 
-        "$CAMEL_BIN" run routes/kaoto-postgres.camel.yaml \
-          --properties=application.properties \
+        "$CAMEL_BIN" run kaoto-postgres.camel.yaml \
+          --properties=../application.properties \
           --dep org.postgresql:postgresql:42.7.3 \
           --dep org.apache.camel:camel-sql \
           --dep org.apache.camel:camel-xpath \
