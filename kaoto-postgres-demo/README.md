@@ -29,10 +29,30 @@ export KAOTO_DB_PASSWORD=kaoto
 camel run routes/kaoto-postgres.camel.yaml \
   --properties=application.properties \
   --dep org.postgresql:postgresql:42.7.3 \
-  --dep org.apache.camel:camel-sql
+  --dep org.apache.camel:camel-sql \
+  --dep org.apache.camel:camel-xpath \
+  --dep org.apache.camel:camel-jackson \
+  --dep org.apache.camel:camel-netty-http
 ```
 
-You should see logs printing the latest rows from `kaoto_demo`.
+You should see logs printing a JSON payload with the latest rows from `kaoto_demo`.
+
+## Send XML, get JSON (HTTP)
+
+The route also exposes an HTTP endpoint that accepts an XML payload and returns JSON:
+
+```bash
+curl -sS -X POST http://localhost:8080/kaoto/demo \
+  -H 'Content-Type: application/xml' \
+  --data-binary @- <<'XML'
+<order>
+  <eventType>OrderCreated</eventType>
+  <userId>999</userId>
+  <seatId>B-2</seatId>
+  <price>42.5</price>
+</order>
+XML
+```
 
 ## Open in Kaoto
 

@@ -7,27 +7,89 @@
       password: "{{kaoto.db.password}}"
 
 - route:
-    id: kaoto-postgres-demo
+    id: kaoto-postgres-http
+    from:
+      # Use HTTP POST with XML payload, returns JSON.
+      uri: netty-http:http://0.0.0.0:8080/kaoto/demo
+      parameters:
+        httpMethodRestrict: POST
+      steps:
+        - to:
+            uri: direct:process-xml
+        - setHeader:
+            name: Content-Type
+            constant: application/json
+
+- route:
+    id: kaoto-postgres-sample-timer
     from:
       uri: timer:kaoto-postgres-demo
       parameters:
-        period: 5000
+        period: 8000
       steps:
+        - setBody:
+            simple: |
+              <order>
+                <eventType>OrderCreated</eventType>
+                <userId>123</userId>
+                <seatId>A-1</seatId>
+                <price>50.0</price>
+              </order>
         - to:
-            uri: sql:CREATE TABLE IF NOT EXISTS kaoto_demo (id SERIAL PRIMARY KEY, msg TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW())
-            parameters:
-              dataSource: "#postgresDS"
-        - setHeader:
-            name: msg
-            simple: "Hello from Kaoto at ${date:now:yyyy-MM-dd'T'HH:mm:ss}"
-        - to:
-            uri: sql:INSERT INTO kaoto_demo (msg) VALUES (:#msg)
-            parameters:
-              dataSource: "#postgresDS"
-        - to:
-            uri: sql:SELECT id, msg, created_at FROM kaoto_demo ORDER BY id DESC LIMIT 5
-            parameters:
-              dataSource: "#postgresDS"
+            uri: direct:process-xml
         - log:
-            message: "Last rows: ${body}"
+            message: "JSON out: ${body}"
+
+- route:
+    id: kaoto-postgres-process-xml
+    from:
+      uri: direct:process-xml
+      steps:
+        # Keep a copy of the raw XML for storage/debugging
+        - setHeader:
+            name: sourceXml
+            simple: "${body}"
+
+        # Create table if needed
+        - to:
+            uri: sql:CREATE TABLE IF NOT EXISTS kaoto_demo (id SERIAL PRIMARY KEY, event_type TEXT, user_id BIGINT, seat_id TEXT, price NUMERIC, source_xml TEXT, created_at TIMESTAMP DEFAULT NOW())
+            parameters:
+              dataSource: "#postgresDS"
+
+        # Extract fields from XML using XPath (requires camel-xpath)
+        - setHeader:
+            name: eventType
+            xpath:
+              expression: /order/eventType/text()
+              resultType: java.lang.String
+        - setHeader:
+            name: userId
+            xpath:
+              expression: /order/userId/text()
+              resultType: java.lang.Long
+        - setHeader:
+            name: seatId
+            xpath:
+              expression: /order/seatId/text()
+              resultType: java.lang.String
+        - setHeader:
+            name: price
+            xpath:
+              expression: /order/price/text()
+              resultType: java.math.BigDecimal
+
+        # Insert into Postgres (requires camel-sql)
+        - to:
+            uri: sql:INSERT INTO kaoto_demo (event_type, user_id, seat_id, price, source_xml) VALUES (:#eventType, :#userId, :#seatId, :#price, :#sourceXml)
+            parameters:
+              dataSource: "#postgresDS"
+
+        # Read back latest rows and output JSON (requires camel-jackson)
+        - to:
+            uri: sql:SELECT id, event_type, user_id, seat_id, price, created_at FROM kaoto_demo ORDER BY id DESC LIMIT 5
+            parameters:
+              dataSource: "#postgresDS"
+        - marshal:
+            json:
+              library: Jackson
 
