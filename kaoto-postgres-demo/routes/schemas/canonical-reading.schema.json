@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CanonicalReading",
+  "type": "object",
+  "required": ["sensor", "metrics", "severity", "unitSystem"],
+  "properties": {
+    "sensor": {
+      "type": "object",
+      "required": ["id", "location", "zone"],
+      "properties": {
+        "id": { "type": "string" },
+        "location": { "type": "string" },
+        "zone": { "type": "string" }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "required": ["tempC", "humidity"],
+      "properties": {
+        "tempC": { "type": "number" },
+        "humidity": { "type": "number" }
+      }
+    },
+    "severity": { "type": "string", "enum": ["NORMAL", "ALERT"] },
+    "unitSystem": { "type": "string", "enum": ["metric"] }
+  }
+}
+

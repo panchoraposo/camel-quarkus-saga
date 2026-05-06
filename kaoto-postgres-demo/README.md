@@ -58,6 +58,10 @@ XML
 ## Open in Kaoto
 
 1. Open `kaoto-postgres-demo/routes/kaoto-postgres.camel.yaml` in the editor.
-2. Use the Kaoto editor to modify the route.
-3. Re-run the `camel run ...` command to test your changes.
+2. Click the **Kaoto DataMapper** step (`kaoto-datamapper-reading`) and press **Configure**.
+3. Attach schemas so the DataMapper canvas shows a tree on both sides:
+   - **Source → Body**: `routes/schemas/reading.xsd` (root element: `reading`)
+   - **Target → Body**: `routes/schemas/canonical-reading.schema.json`
+4. Create mappings by drag-and-drop (for example, `reading/sensorId` → `sensor/id`, etc.).
+5. Re-run the `camel run ...` command to test your changes.
 
