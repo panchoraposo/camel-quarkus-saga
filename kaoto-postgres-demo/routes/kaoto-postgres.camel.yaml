@@ -88,11 +88,13 @@
               expression: /reading/humidity/text()
               resultType: java.math.BigDecimal
 
-        # Data mapping / canonical model (simple JSON mapping for demo purposes)
+        # Data mapping / canonical model
+        # Keep it as a single visual step: XSLT transforms the XML body into a canonical JSON document.
+        - to:
+            uri: xslt-saxon:classpath:mappings/reading-to-canonical-json.xsl
         - setHeader:
             name: mappedJson
-            simple: |
-              {"sensor":{"id":"${header.sensorId}","location":"${header.location}"},"metrics":{"tempC":${header.tempC},"humidity":${header.humidity}},"receivedAt":"${date:now:yyyy-MM-dd'T'HH:mm:ssXXX}"}
+            simple: "${body}"
         - log:
             message: |
               Mapped JSON (canonical):

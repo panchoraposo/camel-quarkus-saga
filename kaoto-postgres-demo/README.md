@@ -31,6 +31,7 @@ camel run routes/kaoto-postgres.camel.yaml \
   --dep org.postgresql:postgresql:42.7.3 \
   --dep org.apache.camel:camel-sql \
   --dep org.apache.camel:camel-xpath \
+  --dep org.apache.camel:camel-xslt-saxon \
   --dep org.apache.camel:camel-jackson \
   --dep org.apache.camel:camel-netty-http
 ```
