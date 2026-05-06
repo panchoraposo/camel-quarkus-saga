@@ -30,10 +30,10 @@
         - setBody:
             simple: |
               <reading>
-                <sensorId>S-100</sensorId>
-                <location>lab</location>
-                <tempC>23.7</tempC>
-                <humidity>45.2</humidity>
+                <sensorId>S-${random(100,999)}</sensorId>
+                <location>lab-${random(1,5)}</location>
+                <tempC>${random(15,35)}.${random(0,9)}</tempC>
+                <humidity>${random(30,85)}.${random(0,9)}</humidity>
               </reading>
         - to:
             uri: direct:process-xml
@@ -81,12 +81,16 @@
             name: tempC
             xpath:
               expression: /reading/tempC/text()
-              resultType: java.math.BigDecimal
+              resultType: java.lang.String
         - setHeader:
             name: humidity
             xpath:
               expression: /reading/humidity/text()
-              resultType: java.math.BigDecimal
+              resultType: java.lang.String
+        - log:
+            message: |
+              Extracted fields:
+              sensorId=${header.sensorId}, location=${header.location}, tempC=${header.tempC}, humidity=${header.humidity}
 
         # Data mapping / canonical model (Kaoto DataMapper)
         # This wrapper step is what Kaoto recognizes as a DataMapper step.
@@ -116,7 +120,7 @@
 
         # Read back latest rows and output JSON (requires camel-jackson)
         - to:
-            uri: sql:SELECT id, sensor_id, location, temp_c, humidity, mapped_json, created_at FROM kaoto_readings ORDER BY id DESC LIMIT 5
+            uri: sql:SELECT id, sensor_id, location, temp_c, humidity, created_at FROM kaoto_readings ORDER BY id DESC LIMIT 5
             parameters:
               dataSource: "#postgresDS"
         - marshal:
