@@ -89,3 +89,23 @@ sum by (status) (increase(ticketblaster_saga_orders_total[5m]))
 # Kafka events consumed per service/topic/eventType
 sum by (service, topic, eventType) (rate(ticketblaster_kafka_events_consumed_total[5m]))
 ```
+
+## Load test (seat conflicts + compensations)
+
+There is a small load test script that creates orders in parallel and verifies:
+
+- **Payment failure compensation**: a forced payment failure releases the seat and refunds the user budget.
+- **Seat conflict under load**: many parallel orders on the same seat result in only one “winning” purchase, and everyone else is refunded.
+
+Run it from your workstation (requires `curl`, `jq`, and optionally `oc` to auto-discover routes):
+
+```bash
+chmod +x scripts/load-test-compensations.sh
+./scripts/load-test-compensations.sh
+```
+
+Useful env overrides:
+
+```bash
+TB_CONFLICT_REQUESTS=80 TB_CONCURRENCY=20 ./scripts/load-test-compensations.sh
+```
