@@ -34,45 +34,76 @@ commands:
       component: tools
       workingDir: ${PROJECT_SOURCE}
       commandLine: |
-        set -euo pipefail
+        # NOTE: Dev Spaces runs this using /bin/sh -c (not bash).
+        # Keep this command POSIX-compatible and never fail the workspace start.
+        set -eu
 
         if command -v jbang >/dev/null 2>&1; then
-          echo "JBang already installed: $(jbang --version)"
+          echo "JBang already installed."
           exit 0
         fi
 
         echo "Installing JBang..."
-        curl -Ls https://sh.jbang.dev | bash -s - app setup
-        echo 'export PATH="$HOME/.jbang/bin:$PATH"' >> "$HOME/.bashrc"
-        export PATH="$HOME/.jbang/bin:$PATH"
-        jbang --version
+        if command -v curl >/dev/null 2>&1; then
+          if curl -fsSL https://sh.jbang.dev | bash -s - app setup; then
+            :
+          else
+            echo "WARNING: JBang install script failed. IDE will still start; run install manually in a terminal."
+            exit 0
+          fi
+        else
+          echo "WARNING: curl is not available in the workspace image. IDE will still start."
+          exit 0
+        fi
+
+        if [ -x "$HOME/.jbang/bin/jbang" ]; then
+          "$HOME/.jbang/bin/jbang" --version || true
+        fi
 
   - id: 02-install-camel-cli
     exec:
       component: tools
       workingDir: ${PROJECT_SOURCE}
       commandLine: |
-        set -euo pipefail
-        export PATH="$HOME/.jbang/bin:$PATH"
+        # POSIX + never fail workspace start.
+        set -eu
 
         if command -v camel >/dev/null 2>&1; then
-          echo "Camel CLI already installed: $(camel --version)"
+          echo "Camel CLI already installed."
           exit 0
         fi
 
-        echo "Installing Camel JBang CLI..."
-        jbang app install camel@apache/camel
-        camel --version
+        if [ -x "$HOME/.jbang/bin/jbang" ]; then
+          echo "Installing Camel JBang CLI..."
+          if "$HOME/.jbang/bin/jbang" app install camel@apache/camel; then
+            :
+          else
+            echo "WARNING: Camel CLI install failed. IDE will still start; run install manually in a terminal."
+            exit 0
+          fi
+        else
+          echo "WARNING: JBang is not installed yet. IDE will still start."
+          exit 0
+        fi
+
+        if [ -x "$HOME/.jbang/bin/camel" ]; then
+          "$HOME/.jbang/bin/camel" --version || true
+        fi
 
   - id: 03-run-kaoto-postgres-demo
     exec:
       component: tools
       workingDir: ${PROJECT_SOURCE}/kaoto-postgres-demo
       commandLine: |
-        set -euo pipefail
-        export PATH="$HOME/.jbang/bin:$PATH"
+        set -eu
 
-        camel run routes/kaoto-postgres.camel.yaml \
+        CAMEL_BIN="$HOME/.jbang/bin/camel"
+        if [ ! -x "$CAMEL_BIN" ]; then
+          echo "ERROR: camel CLI not found at $CAMEL_BIN. Run commands 01 and 02 first."
+          exit 1
+        fi
+
+        "$CAMEL_BIN" run routes/kaoto-postgres.camel.yaml \
           --properties=application.properties \
           --dep org.postgresql:postgresql:42.7.3 \
           --dep org.apache.camel:camel-sql
