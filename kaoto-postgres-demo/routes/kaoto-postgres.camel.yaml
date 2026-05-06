@@ -98,9 +98,19 @@
               expression: /order/price/text()
               resultType: java.math.BigDecimal
 
+        # Backward-compatible legacy column used by the initial demo version.
+        # Some environments already have kaoto_demo(msg TEXT NOT NULL), so we always populate it.
+        - to:
+            uri: sql:ALTER TABLE kaoto_demo ADD COLUMN IF NOT EXISTS msg TEXT NOT NULL DEFAULT 'xml-demo'
+            parameters:
+              dataSource: "#postgresDS"
+        - setHeader:
+            name: msg
+            simple: "eventType=${header.eventType}, userId=${header.userId}, seatId=${header.seatId}, price=${header.price}"
+
         # Insert into Postgres (requires camel-sql)
         - to:
-            uri: sql:INSERT INTO kaoto_demo (event_type, user_id, seat_id, price, source_xml) VALUES (:#eventType, :#userId, :#seatId, :#price, :#sourceXml)
+            uri: sql:INSERT INTO kaoto_demo (msg, event_type, user_id, seat_id, price, source_xml) VALUES (:#msg, :#eventType, :#userId, :#seatId, :#price, :#sourceXml)
             parameters:
               dataSource: "#postgresDS"
 
