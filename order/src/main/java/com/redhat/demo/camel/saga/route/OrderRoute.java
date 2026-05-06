@@ -127,12 +127,16 @@ public class OrderRoute extends RouteBuilder {
                 from("direct:insertOrder")
                         .process(exchange -> {
                                 OrderDto order = exchange.getMessage().getBody(OrderDto.class);
+                                Long now = System.currentTimeMillis();
+                                Long date = order != null && order.getDate() != null ? order.getDate() : now;
                                 // setHeader(null) would remove headers; keep explicit keys (null values allowed)
                                 exchange.getMessage().getHeaders().put("orderId", order != null ? order.getOrderId() : null);
                                 exchange.getMessage().getHeaders().put("seatId", order != null ? order.getSeatId() : null);
                                 exchange.getMessage().getHeaders().put("orderStatus", order != null ? order.getOrderStatus() : null);
                                 exchange.getMessage().getHeaders().put("userId", order != null ? order.getUserId() : null);
                                 exchange.getMessage().getHeaders().put("orderMessage", order != null ? order.getOrderMessage() : null);
+                                exchange.getMessage().getHeaders().put("date", date);
+                                exchange.getMessage().getHeaders().put("price", order != null ? order.getPrice() : null);
                         })
                         .log("Headers: orderId=${header.orderId}, userId=${header.userId}, seatId=${header.seatId}, orderStatus=${header.orderStatus}, orderMessage=${header.orderMessage}")
                         .log("SQL: {{sql.insertOrder}}")
@@ -155,7 +159,11 @@ public class OrderRoute extends RouteBuilder {
                         .setHeader("paymentId", simple("${body.paymentId}"))
                         .setHeader("paymentStatus", simple("${body.paymentStatus}"))
                         .setHeader("paymentMessage", simple("${body.paymentMessage}"))
-                        .setHeader("date", simple("${body.date}"))
+                        .process(exchange -> {
+                                OrderDto dto = exchange.getMessage().getBody(OrderDto.class);
+                                Long date = dto != null ? dto.getDate() : null;
+                                exchange.getMessage().setHeader("date", date != null ? date : System.currentTimeMillis());
+                        })
                         .setHeader("price", simple("${body.price}"))
                         .bean(orderService, "refundBudget")
                         .to("direct:updateOrder");
@@ -194,7 +202,11 @@ public class OrderRoute extends RouteBuilder {
                         .setHeader("paymentMessage", simple("${body.paymentMessage}"))
                         .setHeader("seatStatus", simple("${body.seatStatus}"))
                         .setHeader("seatMessage", simple("${body.seatMessage}"))
-                        .setHeader("date", simple("${body.date}"))
+                        .process(exchange -> {
+                                OrderDto dto = exchange.getMessage().getBody(OrderDto.class);
+                                Long date = dto != null ? dto.getDate() : null;
+                                exchange.getMessage().setHeader("date", date != null ? date : System.currentTimeMillis());
+                        })
                         .setHeader("price", simple("${body.price}"))
                         .choice()
                                 .when().simple("${header.orderStatus} == 'FAILED'")

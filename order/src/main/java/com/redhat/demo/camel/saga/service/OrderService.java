@@ -52,6 +52,9 @@ public class OrderService {
         order.setOrderId(orderId);
         order.setOrderStatus("PENDING");
         order.setOrderMessage("Order " + order.getOrderId() + " created successfully.");
+        if (order.getDate() == null) {
+            order.setDate(System.currentTimeMillis());
+        }
         return order;
     }
 
@@ -62,6 +65,7 @@ public class OrderService {
         order.setOrderId(orderId);
         order.setOrderStatus("FAILED");
         order.setOrderMessage("Order could not be created.");
+        order.setDate(System.currentTimeMillis());
         return order;
     }
 
