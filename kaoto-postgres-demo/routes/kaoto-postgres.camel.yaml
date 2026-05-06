@@ -1,0 +1,33 @@
+- beans:
+  - name: postgresDS
+    type: org.postgresql.ds.PGSimpleDataSource
+    properties:
+      url: "{{kaoto.db.url}}"
+      user: "{{kaoto.db.user}}"
+      password: "{{kaoto.db.password}}"
+
+- route:
+    id: kaoto-postgres-demo
+    from:
+      uri: timer:kaoto-postgres-demo
+      parameters:
+        period: 5000
+      steps:
+        - to:
+            uri: sql:CREATE TABLE IF NOT EXISTS kaoto_demo (id SERIAL PRIMARY KEY, msg TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW())
+            parameters:
+              dataSource: "#postgresDS"
+        - setHeader:
+            name: msg
+            simple: "Hello from Kaoto at ${date:now:yyyy-MM-dd'T'HH:mm:ss}"
+        - to:
+            uri: sql:INSERT INTO kaoto_demo (msg) VALUES (:#msg)
+            parameters:
+              dataSource: "#postgresDS"
+        - to:
+            uri: sql:SELECT id, msg, created_at FROM kaoto_demo ORDER BY id DESC LIMIT 5
+            parameters:
+              dataSource: "#postgresDS"
+        - log:
+            message: "Last rows: ${body}"
+
