@@ -159,6 +159,7 @@ function SeatSelection() {
 
     const selectedSeatData = seats.find(seat => seat.seatId === selectedSeat);
     const price = selectedSeatData ? selectedSeatData.price : 0;
+    const seatId = selectedSeat;
 
     if (loadingMe) {
       setStatusTone('pending');
@@ -180,7 +181,7 @@ function SeatSelection() {
 
     try {
       const response = await axios.post(`${orderBaseUrl}/order`, {
-        seatId: selectedSeat,
+        seatId: seatId,
         price: price,
         forceFailPayment: forceFailPayment
       }, {
@@ -201,7 +202,10 @@ function SeatSelection() {
         setStatus(payload?.orderMessage || 'La orden fue rechazada.');
       } else {
         setStatusTone('ok');
-        setStatus('Orden creada. Sigue el flujo en “Órdenes / Timeline”.');
+        setStatus(`Orden creada para ${seatId}. Sigue el flujo en “Órdenes / Timeline”.`);
+        // Avoid confusing "insufficient budget" message right after reserving budget:
+        // clear the selection once the order is accepted.
+        setSelectedSeat('');
       }
       console.log(payload);
 
