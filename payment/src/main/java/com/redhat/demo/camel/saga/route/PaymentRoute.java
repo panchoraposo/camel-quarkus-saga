@@ -31,13 +31,22 @@ public class PaymentRoute extends RouteBuilder {
 
                 onCompletion().process(TbTelemetry::endSpanAndClearMdc);
 
+                // Ensure the payments DB has the required schema. We can't rely on
+                // automatic schema generation in constrained demo clusters.
+                from("timer://paymentDbInit?repeatCount=1&delay=1000")
+                        .routeId("payment-db-init")
+                        .to("sql:{{sql.createPaymentTable}}");
+
                 onException(Exception.class)
                         .log("Exception occurred: ${exception.message}")
-                        .useOriginalMessage()
                         .handled(true)
                         .process(exchange -> {
                                 Object body = exchange.getIn().getBody();
                                 OrderDto order = body instanceof OrderDto ? (OrderDto) body : null;
+                                if (order == null) {
+                                        Object original = exchange.getProperty("tb.orderDto");
+                                        order = original instanceof OrderDto ? (OrderDto) original : null;
+                                }
                                 if (order == null) {
                                         order = new OrderDto();
                                 }
@@ -74,6 +83,7 @@ public class PaymentRoute extends RouteBuilder {
                         .setHeader("paymentId", simple("${body.paymentId}"))
                         .log("Header payment id: ${header.paymentId}")
                         .setBody(simple("${body}"))
+                        .setProperty("tb.orderDto", body())
                         .log("Persisting payment in database: ${body}")
                         // Database insert
                         .to("direct:insertPayment")
