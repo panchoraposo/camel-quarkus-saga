@@ -58,12 +58,6 @@ public class PaymentRoute extends RouteBuilder {
                         .process(TbTelemetry::injectTraceContextIntoHeaders)
                         .to("kafka:payment-events");
 
-                // Ensure the payments DB has the required schema. We can't rely on
-                // automatic schema generation in constrained demo clusters.
-                from("timer://paymentDbInit?repeatCount=1&delay=1000")
-                        .routeId("payment-db-init")
-                        .to("sql:{{sql.createPaymentTable}}");
-
                 // Escuchar eventos de pedidos
                 from("kafka:seat-events")
                         .process(exchange -> TbTelemetry.startKafkaConsumerSpan(exchange, "kafka.consume seat-events"))
@@ -113,6 +107,7 @@ public class PaymentRoute extends RouteBuilder {
                         .setHeader("status", simple("${body.paymentStatus}"))
                         .setHeader("orderMessage", simple("${body.paymentMessage}"))
                         .log("Headers antes de insertar en SQL: paymentId=${header.paymentId}, price=${header.price}, status=${header.status}, date=${header.date}")
+                        .to("sql:{{sql.createPaymentTable}}")
                         .log("SQL: {{sql.insertPayment}}")
                         .to("sql:{{sql.insertPayment}}")
                         .log("Payment created successfully");
