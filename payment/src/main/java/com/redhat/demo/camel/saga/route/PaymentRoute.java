@@ -31,12 +31,6 @@ public class PaymentRoute extends RouteBuilder {
 
                 onCompletion().process(TbTelemetry::endSpanAndClearMdc);
 
-                // Ensure the payments DB has the required schema. We can't rely on
-                // automatic schema generation in constrained demo clusters.
-                from("timer://paymentDbInit?repeatCount=1&delay=1000")
-                        .routeId("payment-db-init")
-                        .to("sql:{{sql.createPaymentTable}}");
-
                 onException(Exception.class)
                         .log("Exception occurred: ${exception.message}")
                         .handled(true)
@@ -63,6 +57,12 @@ public class PaymentRoute extends RouteBuilder {
                         .setHeader(KafkaConstants.KEY, simple("${body.orderId}"))
                         .process(TbTelemetry::injectTraceContextIntoHeaders)
                         .to("kafka:payment-events");
+
+                // Ensure the payments DB has the required schema. We can't rely on
+                // automatic schema generation in constrained demo clusters.
+                from("timer://paymentDbInit?repeatCount=1&delay=1000")
+                        .routeId("payment-db-init")
+                        .to("sql:{{sql.createPaymentTable}}");
 
                 // Escuchar eventos de pedidos
                 from("kafka:seat-events")
