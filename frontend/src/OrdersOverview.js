@@ -41,7 +41,20 @@ const OrdersOverview = () => {
   const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const { token, profile } = useAuth();
-  const orderBaseUrl = process.env.REACT_APP_ORDER_API_URL || 'http://localhost:8083';
+  const orderBaseUrl = useMemo(() => {
+    const explicit = String(process.env.REACT_APP_ORDER_API_URL || "").trim();
+    if (explicit) return explicit;
+    try {
+      if (typeof window !== "undefined") {
+        const h = window.location.hostname;
+        const idx = h.indexOf(".apps.");
+        if (idx > 0) return `${window.location.protocol}//order-order${h.slice(idx)}`;
+      }
+    } catch {
+      // ignore
+    }
+    return "http://localhost:8083";
+  }, []);
 
   const fetchOrders = useCallback(async () => {
     const ordersRes = await fetch(`${orderBaseUrl}/orders`, {
